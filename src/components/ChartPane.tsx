@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ActionType, CandleType, OverlayMode, YAxisType, dispose, init, utils, type Chart, type OverlayCreate } from 'klinecharts'
+import { ActionType, CandleType, OverlayMode, TooltipShowRule, YAxisType, dispose, init, utils, type Chart, type OverlayCreate } from 'klinecharts'
 import type { Candle, CandleKind } from '../types'
 import { MarketRouter } from '../adapters/MarketRouter'
 import { useApp } from '../store/app'
@@ -41,6 +41,7 @@ export default function ChartPane({ index }: { index: number }) {
   const visible = useApp((s) => s.drawingsVisible)
   const isActive = useApp((s) => s.active === index)
   const quote = useApp((s) => s.prices[symbol])
+  const snapshotAt = useApp((s) => s.snapshotAt)
   symRef.current = symbol
 
   const save = () => {
@@ -80,6 +81,7 @@ export default function ChartPane({ index }: { index: number }) {
   useEffect(() => {
     setupKline()
     const c = init(el.current!, { styles: DARK, locale: 'tr-TR' })!
+    if (window.matchMedia('(max-width: 767px)').matches) c.setStyles({ candle: { tooltip: { showRule: TooltipShowRule.FollowCross } } })
     chart.current = c
     c.subscribeAction(ActionType.OnCrosshairChange, (d) => {
       hover.current = (d as { dataIndex?: number }).dataIndex ?? null
@@ -134,6 +136,9 @@ export default function ChartPane({ index }: { index: number }) {
         c.applyNewData(view(list))
         restore()
         setStatus(list.length ? 'ok' : 'error')
+        const last = list.at(-1)
+        const st0 = useApp.getState()
+        if (last && !st0.prices[symbol]) st0.setPrices({ [symbol]: { price: last.close, change: 0 } })
         unsub = MarketRouter.subscribe(symbol, tf, (k) => {
           raw.current = mergeCandle(raw.current, k)
           const st = useApp.getState()
@@ -190,11 +195,13 @@ export default function ChartPane({ index }: { index: number }) {
   }
 
   const info = getSymbol(symbol)
+  const delayed = snapshotAt !== null && info.source !== 'binance'
   return (
     <div onClick={onClick} className={`relative flex flex-col min-h-0 min-w-0 bg-bg border ${isActive ? 'border-acc/60' : 'border-transparent'}`}>
       <div className="flex items-center gap-2 px-2 h-6 text-xs shrink-0">
         <span className="font-semibold text-txt">{displayName(symbol)}</span>
         <span className="text-mute truncate">{info.name} · {tf}</span>
+        {delayed && <span className="text-yellow-500 whitespace-nowrap" title="Proxy tanımlı değil: veriler periyodik anlık görüntüden gelir">⏱ gecikmeli · {new Date(snapshotAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span>}
         {quote && (
           <span className={`ml-auto ${quote.change >= 0 ? 'text-up' : 'text-down'}`} style={{ color: quote.change >= 0 ? UP : DOWN }}>
             {fmt(quote.price)} ({quote.change >= 0 ? '+' : ''}{fmt(quote.change, 2)}%)

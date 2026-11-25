@@ -21,7 +21,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-      - run: npm ci && npm run build
+      - run: npm ci && VITE_SNAPSHOT_URL="https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/data/" npm run build
       - run: |
           [ -d android ] || npx cap add android
           npx --yes @capacitor/assets@3 generate --android --iconBackgroundColor '#131722' --iconBackgroundColorDark '#131722' --splashBackgroundColor '#131722' --splashBackgroundColorDark '#131722'

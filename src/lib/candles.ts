@@ -10,10 +10,10 @@ export function heikinAshi(list: Candle[]): Candle[] {
   return out
 }
 
-export function aggregate(list: Candle[], ms: number): Candle[] {
+export function aggregate(list: Candle[], ms: number, offset = 0): Candle[] {
   const out: Candle[] = []
   for (const c of list) {
-    const t = Math.floor(c.timestamp / ms) * ms
+    const t = Math.floor((c.timestamp - offset) / ms) * ms + offset
     const last = out[out.length - 1]
     if (last && last.timestamp === t) {
       last.high = Math.max(last.high, c.high)
