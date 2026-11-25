@@ -1,4 +1,4 @@
-import type { Candle, Fundamentals, Quote, Timeframe } from '../types'
+import type { Candle, Fundamentals, Quote, Timeframe, Universe } from '../types'
 import { aggregate } from '../lib/candles'
 import { useApp } from '../store/app'
 import { cached, getJson } from './http'
@@ -14,7 +14,6 @@ const SOURCE: Record<Timeframe, [string, number?, number?]> = {
 
 interface ChartFile { t: number; m: [number, number, number, string]; k: [number, number, number, number, number, number][] }
 interface QuoteFile { t: number; q: Record<string, [number, number]> }
-interface FundFile { t: number; f: Record<string, [number | null, number | null, number | null]> }
 
 const safe = (s: string) => s.replace(/[^A-Za-z0-9]/g, '_')
 
@@ -30,7 +29,8 @@ const chartFile = (symbol: string, interval: string) => load<ChartFile>(`c/${saf
 export const Snapshot = {
   async getCandles(symbol: string, tf: Timeframe): Promise<Candle[]> {
     const [interval, ms, offset] = SOURCE[tf]
-    const f = await chartFile(symbol, interval)
+    // 1 dakikalık dosya yalnızca endeksler, BIST 100 ve emtia için üretilir; yoksa 5 dakikalığa düşülür
+    const f = await chartFile(symbol, interval).catch((e) => (interval === '1m' ? chartFile(symbol, '5m') : Promise.reject(e)))
     const list = f.k.map(([t, open, high, low, close, volume]) => ({ timestamp: t * 1000, open, high, low, close, volume }))
     return ms ? aggregate(list, ms, offset) : list
   },
@@ -40,10 +40,18 @@ export const Snapshot = {
     return Object.fromEntries(symbols.filter((s) => q[s]).map((s) => [s, { price: q[s][0], change: q[s][1] }]))
   },
 
+  getUniverse: (): Promise<Universe> => load<Universe>('bist.json'),
+
   async getFundamentals(symbol: string): Promise<Fundamentals> {
-    const [fund, chart] = await Promise.all([load<FundFile>('fund.json').catch(() => null), chartFile(symbol, '1d')])
-    const [pe, pb, marketCap] = fund?.f[symbol] ?? []
-    const [price, high52, low52, currency] = chart.m
-    return { pe: pe ?? undefined, pb: pb ?? undefined, marketCap: marketCap ?? undefined, price, high52, low52, currency }
+    const [uni, chart] = await Promise.all([Snapshot.getUniverse().catch(() => null), chartFile(symbol, '1d').catch(() => null)])
+    const row = uni?.s[symbol.replace(/\.IS$/, '')]
+    const stats = row && uni ? Object.fromEntries(uni.cols.map((c, i) => [c, row[i]])) : undefined
+    if (!stats && !chart) throw new Error('temel veri yok')
+    const pick = (k: string) => stats?.[k] ?? undefined
+    return {
+      pe: pick('price_earnings_ttm'), pb: pick('price_book_fq'), marketCap: pick('market_cap_basic'),
+      price: chart?.m[0] ?? pick('close'), high52: pick('price_52_week_high') ?? chart?.m[1], low52: pick('price_52_week_low') ?? chart?.m[2],
+      currency: chart?.m[3] ?? 'TRY', stats,
+    }
   },
 }

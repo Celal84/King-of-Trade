@@ -3,9 +3,10 @@ import pkg from '../../package.json'
 import { useApp } from '../store/app'
 import { useReplay } from '../store/replay'
 import { displayName } from '../data/symbols'
-import { TIMEFRAMES, type CandleKind, type Layout } from '../types'
+import { TIMEFRAMES, type CandleKind, type Ccy, type Layout } from '../types'
 
 const KINDS: [CandleKind, string][] = [['candle', 'Mum'], ['hollow', 'Hollow'], ['heikin', 'Heikin Ashi'], ['line', 'Çizgi'], ['area', 'Alan']]
+const CCYS: [Ccy, string][] = [['ORG', 'Orijinal'], ['TRY', 'TL'], ['USD', 'USD'], ['EUR', 'EUR']]
 const LAYOUTS: [Layout, typeof Square][] = [['1x1', Square], ['1x2', Columns2], ['2x2', LayoutGrid]]
 
 interface Props {
@@ -16,7 +17,7 @@ interface Props {
 }
 
 export default function TopBar({ onSearch, onIndicators, onAlerts, onSettings }: Props) {
-  const { panes, active, tf, candleKind, logScale, layout, set } = useApp()
+  const { panes, active, tf, candleKind, ccy, layout, set } = useApp()
   const replay = useReplay()
   const toggleReplay = () =>
     replay.active ? replay.set({ active: false, playing: false, selecting: false, cursor: -1 }) : replay.set({ active: true, selecting: true, playing: false, cursor: -1, pane: active })
@@ -29,6 +30,9 @@ export default function TopBar({ onSearch, onIndicators, onAlerts, onSettings }:
       <button className="btn border border-line" onClick={onSearch} title="Sembol Ara (Ctrl+K)">
         <Search size={14} /> <span className="font-semibold">{displayName(panes[active])}</span>
       </button>
+      <select className={`inp w-auto h-8 text-xs ${ccy !== 'ORG' ? 'border-acc text-[#5b8cff]' : ''}`} value={ccy} title="Grafik para birimi" onChange={(e) => set({ ccy: e.target.value as Ccy })}>
+        {CCYS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+      </select>
       <div className="flex">
         {TIMEFRAMES.map((t) => (
           <button key={t} className={`btn px-1.5 ${tf === t ? 'btn-on' : ''}`} onClick={() => set({ tf: t })}>{t}</button>
@@ -37,7 +41,6 @@ export default function TopBar({ onSearch, onIndicators, onAlerts, onSettings }:
       <select className="inp w-auto h-8 text-xs" value={candleKind} onChange={(e) => set({ candleKind: e.target.value as CandleKind })}>
         {KINDS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
       </select>
-      <button className={`btn ${logScale ? 'btn-on' : ''}`} onClick={() => set({ logScale: !logScale })} title="Logaritmik ölçek">Log</button>
       <button className="btn" onClick={onIndicators}><BarChart3 size={14} /> İndikatör</button>
       <div className="hidden md:flex">
         {LAYOUTS.map(([l, I]) => (

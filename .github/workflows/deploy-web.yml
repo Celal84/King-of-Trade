@@ -25,10 +25,14 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci && npm run build
-      - name: Yahoo veri anlık görüntüsü
+      - run: npm ci
+      - name: BIST hisse listesini güncelle
+        continue-on-error: true
+        run: node scripts/snapshot.mjs universe src/data/bist.json
+      - run: npm run build
+      - name: Piyasa verisi anlık görüntüsü
         continue-on-error: ${{ github.event_name != 'schedule' }}
-        run: SNAPSHOT_URL="https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/data/" node scripts/snapshot.mjs dist/data
+        run: node scripts/snapshot.mjs dist/data
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:

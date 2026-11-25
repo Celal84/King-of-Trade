@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { ActionType, CandleType, OverlayMode, TooltipShowRule, YAxisType, dispose, init, utils, type Chart, type OverlayCreate } from 'klinecharts'
-import type { Candle, CandleKind } from '../types'
+import { ActionType, CandleType, DomPosition, OverlayMode, TooltipShowRule, YAxisType, dispose, init, utils, type Chart, type OverlayCreate } from 'klinecharts'
+import type { Candle, CandleKind, Timeframe } from '../types'
 import { MarketRouter } from '../adapters/MarketRouter'
 import { useApp } from '../store/app'
 import { useReplay } from '../store/replay'
@@ -13,6 +13,18 @@ import { displayName, getSymbol } from '../data/symbols'
 const GROUP = 'drawings'
 const view = (l: Candle[]) => (useApp.getState().candleKind === 'heikin' ? heikinAshi(l) : l)
 const precisionOf = (p = 1) => (p < 1 ? 6 : p < 10 ? 4 : 2)
+const DEFAULT_BAR = 8
+
+interface YAxisInternal {
+  getRange: () => { from: number; to: number; range: number }
+  setRange: (r: Record<string, number>) => void
+  convertToRealValue: (v: number) => number
+  setAutoCalcTickFlag: (f: boolean) => void
+}
+interface ChartInternal {
+  getDrawPaneById: (id: string) => { getAxisComponent: () => YAxisInternal } | null
+  adjustPaneViewport: (...flags: boolean[]) => void
+}
 
 const CANDLE_STYLE: Record<CandleKind, object> = {
   candle: { type: CandleType.CandleSolid },
@@ -31,9 +43,12 @@ export default function ChartPane({ index }: { index: number }) {
   const hover = useRef<number | null>(null)
   const restoring = useRef(false)
   const symRef = useRef('')
+  const pendingFit = useRef<number | null>(null)
   const [status, setStatus] = useState<'loading' | 'ok' | 'error'>('loading')
+  const [lastClose, setLastClose] = useState<number>()
   const symbol = useApp((s) => s.panes[index])
   const tf = useApp((s) => s.tf)
+  const ccy = useApp((s) => s.ccy)
   const kind = useApp((s) => s.candleKind)
   const log = useApp((s) => s.logScale)
   const indicators = useApp((s) => s.indicators)
@@ -42,7 +57,9 @@ export default function ChartPane({ index }: { index: number }) {
   const isActive = useApp((s) => s.active === index)
   const quote = useApp((s) => s.prices[symbol])
   const snapshotAt = useApp((s) => s.snapshotAt)
-  symRef.current = symbol
+  const shownCcy = MarketRouter.currencyOf(symbol, ccy)
+  const converted = shownCcy !== getSymbol(symbol).currency
+  symRef.current = converted ? `${symbol}:${shownCcy}` : symbol
 
   const save = () => {
     const c = chart.current
@@ -66,6 +83,35 @@ export default function ChartPane({ index }: { index: number }) {
       onRemoved: (e) => (ids.current.delete(e.overlay.id), save(), false),
     })
     if (typeof id === 'string') ids.current.add(id)
+  }
+
+  const internal = () => chart.current as unknown as ChartInternal | null
+  const yAxis = () => internal()?.getDrawPaneById('candle_pane')?.getAxisComponent()
+  const scalePrice = (f: number) => {
+    const y = yAxis()
+    if (!y) return
+    const { from, to, range } = y.getRange()
+    const d = (range * f - range) / 2
+    const [realFrom, realTo] = [y.convertToRealValue(from - d), y.convertToRealValue(to + d)]
+    y.setRange({ from: from - d, to: to + d, range: range * f, realFrom, realTo, realRange: realTo - realFrom })
+    internal()?.adjustPaneViewport(false, true, true, true)
+  }
+  const autoPrice = () => {
+    yAxis()?.setAutoCalcTickFlag(true)
+    internal()?.adjustPaneViewport(false, true, true, true)
+  }
+  const applyFit = () => {
+    const c = chart.current
+    const ms = pendingFit.current
+    if (!c || ms === null) return
+    pendingFit.current = null
+    const list = c.getDataList()
+    const from = (list.at(-1)?.timestamp ?? 0) - ms
+    const bars = Math.max(10, list.filter((k) => k.timestamp >= from).length)
+    const width = c.getSize('candle_pane', DomPosition.Main)?.width ?? 600
+    c.setBarSpace(Math.min(50, Math.max(1, (width - 60) / bars)))
+    c.scrollToRealTime()
+    autoPrice()
   }
 
   const restore = () => {
@@ -100,6 +146,20 @@ export default function ChartPane({ index }: { index: number }) {
         c.removeOverlay({ groupId: GROUP })
         saveDrawings(symRef.current, [])
       },
+      zoom: (f) => c.zoomAtCoordinate(f, { x: (c.getSize('candle_pane', DomPosition.Main)?.width ?? 0) / 2, y: 0 }, 150),
+      scalePrice,
+      autoPrice,
+      toLatest: () => c.scrollToRealTime(200),
+      reset: () => {
+        c.setBarSpace(DEFAULT_BAR)
+        c.scrollToRealTime()
+        autoPrice()
+      },
+      fit: (ms: number, next: Timeframe) => {
+        pendingFit.current = ms
+        if (useApp.getState().tf === next) applyFit()
+        else useApp.getState().set({ tf: next })
+      },
     })
     const unsubReplay = useReplay.subscribe((s, p) => {
       if (s.pane !== index) return
@@ -128,32 +188,36 @@ export default function ChartPane({ index }: { index: number }) {
     if (rp.active && rp.pane === index) rp.set({ active: false, playing: false, selecting: false, cursor: -1 })
     const daily = tf === '1d' || tf === '1w'
     c.setCustomApi({ formatDate: (dtf, ts, format) => utils.formatDate(dtf, ts, daily ? format.replace(' HH:mm', '') : format) })
-    MarketRouter.getCandles(symbol, tf)
+    MarketRouter.getCandles(symbol, tf, ccy)
       .then((list) => {
         if (!alive) return
         raw.current = list
         c.setPriceVolumePrecision(precisionOf(list.at(-1)?.close), 2)
         c.applyNewData(view(list))
         restore()
+        autoPrice()
+        applyFit()
         setStatus(list.length ? 'ok' : 'error')
         const last = list.at(-1)
+        setLastClose(last?.close)
         const st0 = useApp.getState()
-        if (last && !st0.prices[symbol]) st0.setPrices({ [symbol]: { price: last.close, change: 0 } })
+        if (last && !converted && !st0.prices[symbol]) st0.setPrices({ [symbol]: { price: last.close, change: 0 } })
         unsub = MarketRouter.subscribe(symbol, tf, (k) => {
           raw.current = mergeCandle(raw.current, k)
+          setLastClose(k.close)
           const st = useApp.getState()
-          st.setPrices({ [symbol]: { price: k.close, change: st.prices[symbol]?.change ?? 0 } })
+          if (!converted) st.setPrices({ [symbol]: { price: k.close, change: st.prices[symbol]?.change ?? 0 } })
           const r = useReplay.getState()
           if (r.active && r.pane === index) return
           c.updateData(view(raw.current).at(-1)!)
-        })
+        }, ccy)
       })
       .catch(() => alive && setStatus('error'))
     return () => {
       alive = false
       unsub()
     }
-  }, [symbol, tf, index])
+  }, [symbol, tf, ccy, index])
 
   useEffect(() => {
     chart.current?.setStyles({ candle: CANDLE_STYLE[kind] })
@@ -200,15 +264,16 @@ export default function ChartPane({ index }: { index: number }) {
     <div onClick={onClick} className={`relative flex flex-col min-h-0 min-w-0 bg-bg border ${isActive ? 'border-acc/60' : 'border-transparent'}`}>
       <div className="flex items-center gap-2 px-2 h-6 text-xs shrink-0">
         <span className="font-semibold text-txt">{displayName(symbol)}</span>
-        <span className="text-mute truncate">{info.name} · {tf}</span>
+        <span className="text-mute truncate"><span className="hidden sm:inline">{info.name} · </span>{tf} · {shownCcy}</span>
         {delayed && <span className="text-yellow-500 whitespace-nowrap" title="Proxy tanımlı değil: veriler periyodik anlık görüntüden gelir">⏱ gecikmeli · {new Date(snapshotAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span>}
-        {quote && (
-          <span className={`ml-auto ${quote.change >= 0 ? 'text-up' : 'text-down'}`} style={{ color: quote.change >= 0 ? UP : DOWN }}>
+        {converted && lastClose !== undefined && <span className="ml-auto whitespace-nowrap tabular-nums">{fmt(lastClose, precisionOf(lastClose))} {shownCcy}</span>}
+        {quote && !converted && (
+          <span className={`ml-auto whitespace-nowrap ${quote.change >= 0 ? 'text-up' : 'text-down'}`} style={{ color: quote.change >= 0 ? UP : DOWN }}>
             {fmt(quote.price)} ({quote.change >= 0 ? '+' : ''}{fmt(quote.change, 2)}%)
           </span>
         )}
       </div>
-      <div ref={el} className="flex-1 min-h-0" />
+      <div ref={el} className="flex-1 min-h-0" style={{ touchAction: 'none' }} />
       {status !== 'ok' && (
         <div className="absolute inset-0 top-6 flex items-center justify-center text-mute text-sm pointer-events-none">
           {status === 'loading' ? 'Yükleniyor…' : 'Veri alınamadı. Ayarlar’dan Proxy URL girmeyi deneyin.'}
