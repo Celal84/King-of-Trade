@@ -7,7 +7,7 @@ async function get<T>(path: string): Promise<T> {
   let err: unknown
   for (const h of HOSTS) {
     try {
-      const r = await fetch(h + path)
+      const r = await fetch(h + path, { signal: AbortSignal.timeout(6000) })
       if (r.ok) return (await r.json()) as T
       err = new Error(`HTTP ${r.status}`)
     } catch (e) {

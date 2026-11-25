@@ -25,9 +25,10 @@ interface AppState {
   tab: PanelTab
   prices: Record<string, Quote>
   watchSymbols: string[]
+  snapshotAt: number | null
   setSymbol: (s: string) => void
   setActive: (i: number) => void
-  set: (p: Partial<Pick<AppState, 'layout' | 'tf' | 'candleKind' | 'logScale' | 'magnet' | 'drawingsVisible' | 'tab' | 'watchSymbols'>>) => void
+  set: (p: Partial<Pick<AppState, 'layout' | 'tf' | 'candleKind' | 'logScale' | 'magnet' | 'drawingsVisible' | 'tab' | 'watchSymbols' | 'snapshotAt'>>) => void
   toggleIndicator: (n: string) => void
   toggleFavorite: (s: string) => void
   setSettings: (s: Partial<Settings>) => void
@@ -51,6 +52,7 @@ export const useApp = create<AppState>()(
       tab: 'watch',
       prices: {},
       watchSymbols: [],
+      snapshotAt: null,
       setSymbol: (s) => set((st) => ({ panes: st.panes.map((p, i) => (i === st.active ? s : p)) })),
       setActive: (active) => set({ active }),
       set: (p) => set(p),
@@ -61,7 +63,7 @@ export const useApp = create<AppState>()(
     }),
     {
       name: 'kot:app',
-      partialize: ({ prices: _p, watchSymbols: _w, ...rest }) => rest,
+      partialize: ({ prices: _p, watchSymbols: _w, snapshotAt: _s, ...rest }) => rest,
     },
   ),
 )

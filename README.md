@@ -18,8 +18,13 @@ npm run dev
 npm run build
 ```
 
-## Yahoo Proxy (önerilir)
-Tarayıcıda Yahoo Finance CORS engeli nedeniyle bir proxy gerekir. `worker/yahoo-proxy.js` dosyasını ücretsiz bir Cloudflare Worker olarak yayınlayın ve URL'yi uygulamada **Ayarlar → Yahoo Proxy URL** alanına girin. Boş bırakılırsa genel CORS proxy'leri yedekli denenir (güvenilir değildir). Android APK'da istekler native HTTP ile gittiği için proxy gerekmez.
+## Yahoo verisi nasıl gelir?
+Tarayıcıda Yahoo Finance CORS engeli vardır. Uygulama sırayla şu kaynakları kullanır:
+1. **Android APK:** istekler native HTTP ile doğrudan gider.
+2. **Özel proxy (canlıya en yakın):** `worker/yahoo-proxy.js` dosyasını ücretsiz bir Cloudflare Worker olarak yayınlayıp URL'yi **Ayarlar → Yahoo Proxy URL** alanına girin.
+3. **Anlık görüntü (ayarsız çalışır):** `deploy-web.yml` yaklaşık 15 dakikada bir `scripts/snapshot.mjs` ile tüm sembollerin fiyat, mum ve temel verilerini çekip siteyle birlikte `data/` altında yayınlar. Proxy yoksa uygulama bu veriyi kullanır ve grafikte "⏱ gecikmeli" etiketi gösterir.
+
+Yahoo'nun BIST verisi kaynağında da yaklaşık 15 dakika gecikmelidir. Kripto verisi Binance'ten canlı gelir.
 
 ## Dağıtım
 - **Web:** `main` dalına push → `.github/workflows/deploy-web.yml` → GitHub Pages. (Repo Ayarları → Pages → Source: *GitHub Actions*.)

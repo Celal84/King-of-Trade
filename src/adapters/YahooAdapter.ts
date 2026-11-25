@@ -1,6 +1,8 @@
 import type { Candle, Fundamentals, Quote, Timeframe } from '../types'
 import { aggregate } from '../lib/candles'
-import { proxiedJson } from './http'
+import { hasLiveSource, proxiedJson } from './http'
+import { Snapshot } from './snapshot'
+import { useApp } from '../store/app'
 
 const BASE = 'https://query1.finance.yahoo.com'
 const PARAMS: Record<Timeframe, [string, string]> = {
@@ -38,7 +40,23 @@ async function chart(symbol: string, interval: string, range: string) {
   return r
 }
 
-export const YahooAdapter = {
+async function withFallback<T>(live: () => Promise<T>, snap: () => Promise<T>, valid: (v: T) => boolean = () => true): Promise<T> {
+  const liveFirst = hasLiveSource()
+  const [first, second] = liveFirst ? [live, snap] : [snap, live]
+  const markLive = (isLive: boolean) => isLive && useApp.getState().snapshotAt !== null && useApp.getState().set({ snapshotAt: null })
+  try {
+    const v = await first()
+    if (!valid(v)) throw new Error('boş')
+    markLive(liveFirst)
+    return v
+  } catch {
+    const v = await second()
+    markLive(!liveFirst)
+    return v
+  }
+}
+
+const Live = {
   async getCandles(symbol: string, tf: Timeframe): Promise<Candle[]> {
     const [interval, range] = PARAMS[tf]
     const r = await chart(symbol, interval, range)
@@ -90,4 +108,15 @@ export const YahooAdapter = {
       high52: meta.fiftyTwoWeekHigh, low52: meta.fiftyTwoWeekLow, price: meta.regularMarketPrice, currency: meta.currency,
     }
   },
+}
+
+const notEmpty = (v: object) => (Array.isArray(v) ? v.length > 0 : Object.keys(v).length > 0)
+
+export const YahooAdapter = {
+  getCandles: (symbol: string, tf: Timeframe): Promise<Candle[]> =>
+    withFallback(() => Live.getCandles(symbol, tf), () => Snapshot.getCandles(symbol, tf), notEmpty),
+  getQuotes: (symbols: string[]): Promise<Record<string, Quote>> =>
+    withFallback(() => Live.getQuotes(symbols), () => Snapshot.getQuotes(symbols), notEmpty),
+  getFundamentals: (symbol: string): Promise<Fundamentals> =>
+    withFallback(() => Live.getFundamentals(symbol), () => Snapshot.getFundamentals(symbol), (f) => f.price !== undefined || f.pe !== undefined),
 }

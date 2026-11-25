@@ -1,30 +1,47 @@
 import { Capacitor } from '@capacitor/core'
 import { useApp } from '../store/app'
 
-type Wrap = (url: string) => string
+interface Proxy {
+  wrap: (url: string) => string
+  unwrap?: (body: unknown) => unknown
+}
+
 const enc = encodeURIComponent
-const FALLBACKS: Wrap[] = [(u) => `https://corsproxy.io/?url=${enc(u)}`, (u) => `https://api.allorigins.win/raw?url=${enc(u)}`, (u) => `https://api.codetabs.com/v1/proxy?quest=${enc(u)}`]
+const PUBLIC: Proxy[] = [
+  { wrap: (u) => `https://api.allorigins.win/get?url=${enc(u)}`, unwrap: (b) => JSON.parse((b as { contents: string }).contents) },
+  { wrap: (u) => `https://api.allorigins.win/raw?url=${enc(u)}` },
+  { wrap: (u) => `https://api.codetabs.com/v1/proxy?quest=${enc(u)}` },
+]
 const TTL = 60_000
+const TIMEOUT = 8_000
 const cache = new Map<string, { t: number; p: Promise<unknown> }>()
 let preferred = 0
 
-function wrappers(): Wrap[] {
-  const custom = useApp.getState().settings.proxyUrl.trim()
-  const list: Wrap[] = []
-  if (Capacitor.isNativePlatform()) list.push((u) => u)
-  if (custom) list.push((u) => `${custom}${custom.includes('?') ? '&' : '?'}url=${enc(u)}`)
-  return [...list, ...FALLBACKS]
+const customProxy = () => useApp.getState().settings.proxyUrl.trim()
+
+/** Canlı kaynak (native HTTP veya kullanıcının proxy'si) tanımlı mı? */
+export const hasLiveSource = () => Capacitor.isNativePlatform() || !!customProxy()
+
+function proxies(): Proxy[] {
+  if (Capacitor.isNativePlatform()) return [{ wrap: (u) => u }]
+  const custom = customProxy()
+  return custom ? [{ wrap: (u) => `${custom}${custom.includes('?') ? '&' : '?'}url=${enc(u)}` }] : PUBLIC
+}
+
+export async function getJson(url: string, timeout = TIMEOUT): Promise<unknown> {
+  const r = await fetch(url, { signal: AbortSignal.timeout(timeout) })
+  if (!r.ok) throw new Error(`HTTP ${r.status}`)
+  return r.json()
 }
 
 async function tryAll(url: string): Promise<unknown> {
-  const ws = wrappers()
-  const order = ws.map((_, i) => (i + preferred) % ws.length)
+  const ps = proxies()
   let err: unknown
-  for (const i of order) {
+  for (let n = 0; n < ps.length; n++) {
+    const i = (n + preferred) % ps.length
     try {
-      const r = await fetch(ws[i](url))
-      if (!r.ok) throw new Error(`HTTP ${r.status}`)
-      const j = await r.json()
+      const body = await getJson(ps[i].wrap(url))
+      const j = ps[i].unwrap ? ps[i].unwrap!(body) : body
       preferred = i
       return j
     } catch (e) {
@@ -34,11 +51,13 @@ async function tryAll(url: string): Promise<unknown> {
   throw err instanceof Error ? err : new Error('Proxy hatası')
 }
 
-export function proxiedJson<T>(url: string, ttl = TTL): Promise<T> {
-  const hit = cache.get(url)
+export function cached<T>(key: string, ttl: number, load: () => Promise<T>): Promise<T> {
+  const hit = cache.get(key)
   if (hit && Date.now() - hit.t < ttl) return hit.p as Promise<T>
-  const p = tryAll(url)
-  cache.set(url, { t: Date.now(), p })
-  p.catch(() => cache.delete(url))
-  return p as Promise<T>
+  const p = load()
+  cache.set(key, { t: Date.now(), p })
+  p.catch(() => cache.delete(key))
+  return p
 }
+
+export const proxiedJson = <T>(url: string, ttl = TTL): Promise<T> => cached(url, ttl, () => tryAll(url) as Promise<T>)

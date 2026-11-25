@@ -19,12 +19,12 @@ export function usePriceFeed() {
   const watch = useApp((s) => s.watchSymbols)
   useEffect(() => {
     let alive = true
-    const run = async () => {
-      const q = await MarketRouter.getQuotes(tracked())
-      if (!alive) return
-      useApp.getState().setPrices(q)
-      usePaper.getState().check(useApp.getState().prices)
-    }
+    const run = () =>
+      MarketRouter.streamQuotes(tracked(), (q) => {
+        if (!alive) return
+        useApp.getState().setPrices(q)
+        usePaper.getState().check(useApp.getState().prices)
+      })
     run()
     const id = setInterval(run, INTERVAL)
     return () => {

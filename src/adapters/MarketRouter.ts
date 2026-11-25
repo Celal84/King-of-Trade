@@ -10,13 +10,13 @@ const POLL_MS = 30_000
 export const MarketRouter = {
   getCandles: (symbol: string, tf: Timeframe): Promise<Candle[]> => ADAPTERS[getSymbol(symbol).source].getCandles(symbol, tf),
 
-  async getQuotes(symbols: string[]): Promise<Record<string, Quote>> {
+  /** Her kaynağın fiyatları hazır oldukça `onPart` ile iletilir; yavaş bir kaynak diğerlerini bekletmez. */
+  async streamQuotes(symbols: string[], onPart: (q: Record<string, Quote>) => void): Promise<void> {
     const groups: Record<Source, string[]> = { binance: [], yahoo: [], synthetic: [] }
     for (const s of new Set(symbols)) groups[getSymbol(s).source].push(s)
-    const parts = await Promise.all(
-      (Object.keys(groups) as Source[]).map((k) => (groups[k].length ? ADAPTERS[k].getQuotes(groups[k]).catch(() => ({})) : {})),
+    await Promise.all(
+      (Object.keys(groups) as Source[]).filter((k) => groups[k].length).map((k) => ADAPTERS[k].getQuotes(groups[k]).then(onPart, () => undefined)),
     )
-    return Object.assign({}, ...parts)
   },
 
   getFundamentals: (symbol: string): Promise<Fundamentals> => YahooAdapter.getFundamentals(symbol),
