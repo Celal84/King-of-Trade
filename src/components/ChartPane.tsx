@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ActionType, CandleType, OverlayMode, YAxisType, dispose, init, type Chart, type OverlayCreate } from 'klinecharts'
+import { ActionType, CandleType, OverlayMode, YAxisType, dispose, init, utils, type Chart, type OverlayCreate } from 'klinecharts'
 import type { Candle, CandleKind } from '../types'
 import { MarketRouter } from '../adapters/MarketRouter'
 import { useApp } from '../store/app'
@@ -122,6 +122,10 @@ export default function ChartPane({ index }: { index: number }) {
     let alive = true
     let unsub = () => {}
     setStatus('loading')
+    const rp = useReplay.getState()
+    if (rp.active && rp.pane === index) rp.set({ active: false, playing: false, selecting: false, cursor: -1 })
+    const daily = tf === '1d' || tf === '1w'
+    c.setCustomApi({ formatDate: (dtf, ts, format) => utils.formatDate(dtf, ts, daily ? format.replace(' HH:mm', '') : format) })
     MarketRouter.getCandles(symbol, tf)
       .then((list) => {
         if (!alive) return

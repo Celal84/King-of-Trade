@@ -53,6 +53,7 @@ export function rsi(closes: number[], period = 14): number | undefined {
 
 export const fmt = (v: number | undefined, d?: number) => {
   if (v === undefined || !isFinite(v)) return '—'
+  if (Math.abs(v) < 1e-9) v = 0
   const digits = d ?? (Math.abs(v) >= 1000 ? 2 : Math.abs(v) >= 1 ? 2 : 6)
   return v.toLocaleString('tr-TR', { minimumFractionDigits: digits, maximumFractionDigits: digits })
 }

@@ -44,10 +44,12 @@ export const YahooAdapter = {
     const r = await chart(symbol, interval, range)
     const q = r.indicators.quote[0]
     const out: Candle[] = []
-    ;(r.timestamp ?? []).forEach((t, i) => {
-      const [o, h, l, c] = [q.open[i], q.high[i], q.low[i], q.close[i]]
+    const ts = r.timestamp ?? []
+    ts.forEach((t, i) => {
+      const [o, h, l] = [q.open[i], q.high[i], q.low[i]]
+      const c = q.close[i] ?? (i === ts.length - 1 ? r.meta.regularMarketPrice : null)
       if (o == null || h == null || l == null || c == null) return
-      out.push({ timestamp: t * 1000, open: o, high: h, low: l, close: c, volume: q.volume[i] ?? 0 })
+      out.push({ timestamp: t * 1000, open: o, high: Math.max(h, c), low: Math.min(l, c), close: c, volume: q.volume[i] ?? 0 })
     })
     return tf === '4h' ? aggregate(out, 4 * 3600_000) : out
   },

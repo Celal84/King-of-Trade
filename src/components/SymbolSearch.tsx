@@ -5,13 +5,15 @@ import { CATEGORIES, SYMBOLS, displayName } from '../data/symbols'
 import { useApp } from '../store/app'
 import type { Category } from '../types'
 
+const fold = (s: string) => s.toLocaleLowerCase('tr-TR').replace(/ı/g, 'i').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+
 export default function SymbolSearch({ onClose }: { onClose: () => void }) {
   const [q, setQ] = useState('')
   const [cat, setCat] = useState<Category | 'ALL'>('ALL')
   const { favorites, toggleFavorite, setSymbol } = useApp()
   const list = useMemo(() => {
-    const t = q.trim().toLocaleUpperCase('tr-TR')
-    return SYMBOLS.filter((s) => (cat === 'ALL' || s.category === cat) && (!t || s.symbol.includes(t) || s.name.toLocaleUpperCase('tr-TR').includes(t)))
+    const t = fold(q.trim())
+    return SYMBOLS.filter((s) => (cat === 'ALL' || s.category === cat) && (!t || fold(s.symbol).includes(t) || fold(s.name).includes(t)))
   }, [q, cat])
   const pick = (s: string) => {
     setSymbol(s)

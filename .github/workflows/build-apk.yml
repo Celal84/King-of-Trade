@@ -22,7 +22,9 @@ jobs:
       - run: npm ci && npm run build
       - run: |
           [ -d android ] || npx cap add android
+          npx --yes @capacitor/assets@3 generate --android --iconBackgroundColor '#131722' --iconBackgroundColorDark '#131722' --splashBackgroundColor '#131722' --splashBackgroundColorDark '#131722'
           npx cap sync android
+          sed -i "s/versionName \"1.0\"/versionName \"$(node -p "require('./package.json').version")\"/" android/app/build.gradle
       - working-directory: android
         run: |
           chmod +x gradlew
