@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; margin: 0; background: #131722; color: #d1d4dc; overscroll-behavior: none; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+.safe { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+
+@layer components {
+  .btn { @apply inline-flex items-center gap-1 px-2 h-8 rounded text-xs text-txt hover:bg-line whitespace-nowrap shrink-0; }
+  .btn-on { @apply bg-acc/20 text-[#5b8cff]; }
+  .inp { @apply bg-bg border border-line rounded px-2 h-8 text-sm text-txt outline-none focus:border-acc w-full; }
+  .tab { @apply px-3 h-9 text-xs text-mute border-b-2 border-transparent whitespace-nowrap; }
+  .tab-on { @apply text-txt border-acc; }
+}
