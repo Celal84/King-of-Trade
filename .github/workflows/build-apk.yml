@@ -5,6 +5,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   apk:
     runs-on: ubuntu-latest
@@ -29,8 +32,22 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
-      - run: cp android/app/build/outputs/apk/debug/app-debug.apk KingOfTrade-debug.apk
+      - id: ver
+        run: |
+          NAME="KingOfTrade_v$(node -p "require('./package.json').version")"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/$NAME" >/dev/null; then echo "exists=true" >> "$GITHUB_OUTPUT"; else echo "exists=false" >> "$GITHUB_OUTPUT"; fi
+          cp android/app/build/outputs/apk/debug/app-debug.apk KingOfTrade-debug.apk
+          cp KingOfTrade-debug.apk "$NAME.apk"
       - uses: actions/upload-artifact@v4
         with:
           name: KingOfTrade-debug.apk
           path: KingOfTrade-debug.apk
+      - if: github.ref == 'refs/heads/main' && steps.ver.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.name }}
+          name: ${{ steps.ver.outputs.name }}
+          target_commitish: ${{ github.sha }}
+          files: ${{ steps.ver.outputs.name }}.apk
+          generate_release_notes: true
