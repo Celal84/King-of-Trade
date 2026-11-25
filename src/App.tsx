@@ -13,9 +13,10 @@ import SettingsModal from './components/SettingsModal'
 import { useIsMobile } from './hooks/useIsMobile'
 import { usePriceFeed } from './hooks/usePriceFeed'
 import { useAlertEngine } from './hooks/useAlertEngine'
+import { useCryptoUniverse } from './hooks/useCrypto'
 import { useReplay } from './store/replay'
 
-type ModalKind = 'search' | 'indicators' | 'alerts' | 'settings' | null
+type ModalKind = 'search' | 'compare' | 'indicators' | 'alerts' | 'settings' | null
 
 export default function App() {
   const mobile = useIsMobile()
@@ -25,6 +26,7 @@ export default function App() {
   const close = () => setModal(null)
   usePriceFeed()
   useAlertEngine()
+  useCryptoUniverse()
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -39,7 +41,7 @@ export default function App() {
 
   return (
     <div className="safe h-full flex flex-col bg-bg text-txt overflow-hidden">
-      <TopBar onSearch={() => setModal('search')} onIndicators={() => setModal('indicators')} onAlerts={() => setModal('alerts')} onSettings={() => setModal('settings')} />
+      <TopBar onSearch={() => setModal('search')} onIndicators={() => setModal('indicators')} onCompare={() => setModal('compare')} onAlerts={() => setModal('alerts')} onSettings={() => setModal('settings')} />
       {replay && <ReplayBar />}
       <div className="flex flex-1 min-h-0 relative">
         <DrawingToolbar />
@@ -54,6 +56,7 @@ export default function App() {
       <BottomBar />
       {mobile && <MobileNav drawer={drawer} setDrawer={setDrawer} onAlerts={() => setModal('alerts')} />}
       {modal === 'search' && <SymbolSearch onClose={close} />}
+      {modal === 'compare' && <SymbolSearch onClose={close} compareMode />}
       {modal === 'indicators' && <IndicatorMenu onClose={close} />}
       {modal === 'alerts' && <AlertsPanel onClose={close} />}
       {modal === 'settings' && <SettingsModal onClose={close} />}

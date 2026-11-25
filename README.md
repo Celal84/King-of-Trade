@@ -7,8 +7,11 @@ BIST 100, Emtia, Sentetik TR pariteleri ve canlı Kripto destekli, açık kaynak
 - **Veri:** Binance REST + WebSocket (kripto, canlı), Yahoo Finance (mum verisi), toplu tarama kaynağından BIST fiyat/temel/performans verisi.
 - **Para birimi:** her grafik TL, USD veya EUR bazında görüntülenebilir (zaman hizalamalı kur dönüşümü).
 - **Grafik:** `klinecharts` — 1m…1w, Mum / Hollow / Heikin Ashi / Çizgi / Alan, logaritmik ölçek, tüm yerleşik indikatörler + ATR, 1x1 / 1x2 / 2x2 düzen; hazır aralıklar (1G…Tümü), yakınlaştırma ve fiyat ölçeği kontrolleri.
-- **Çizim:** Trend, Işın, Yatay/Dikey, Paralel Kanal, Fibonacci, Fiyat Ölçer, Metin; mıknatıs, gizle/göster, temizle; sembol bazlı kalıcı.
+- **Çizim:** çizgiler (trend, ışın, uzatılmış, ok, yatay/dikey), kanallar ve Fibonacci, şekiller (dikdörtgen, daire, üçgen), fiyat ölçer, al/sat pozisyonu (R/R), metin/not/etiket; mıknatıs, gizle/göster, geri al, temizle; sembol bazlı kalıcı.
 - **Paneller:** İzleme listesi (endeks grubu filtresi), BIST Tarama (performans, hacim, F/K, RSI… sıralama ve hazır taramalar), Temel analiz (değerleme, kârlılık, performans, endeks üyelikleri), çift cüzdanlı Paper Trading.
+- **Karşılaştırma:** 4 sembole kadar yüzde ölçeğinde üst üste; **indikatör ayarları** (periyot ve renk); **çoklu izleme listesi**.
+- **Kripto:** tüm Binance spot pariteleri (USDT / TRY / USDC / FDUSD), hacme göre listeler ve kripto taraması (canlı).
+- **Zaman dilimleri:** 1m, 5m, 15m, 30m, 1h, 2h, 4h, 1d, 1w, 1M; 6 grafiğe kadar çoklu düzen; ekran görüntüsü ve tam ekran.
 - **Bar Replay**, **Alarmlar** (fiyat ve RSI; ses + bildirim + Telegram), `Ctrl+K` sembol arama.
 
 ## Geliştirme

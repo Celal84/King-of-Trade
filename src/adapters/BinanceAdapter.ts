@@ -1,4 +1,10 @@
 import type { Candle, Quote, Timeframe } from '../types'
+import { cached } from './http'
+
+export interface Ticker extends Quote {
+  volume: number
+}
+const BULK = 40
 
 const HOSTS = ['https://api.binance.com', 'https://data-api.binance.vision']
 const WS = 'wss://stream.binance.com:9443/ws'
@@ -7,7 +13,7 @@ async function get<T>(path: string): Promise<T> {
   let err: unknown
   for (const h of HOSTS) {
     try {
-      const r = await fetch(h + path, { signal: AbortSignal.timeout(6000) })
+      const r = await fetch(h + path, { signal: AbortSignal.timeout(10_000) })
       if (r.ok) return (await r.json()) as T
       err = new Error(`HTTP ${r.status}`)
     } catch (e) {
@@ -26,8 +32,19 @@ export const BinanceAdapter = {
     return raw.map(toCandle)
   },
 
+  /** Tüm Binance spot pariteleri: fiyat, 24s değişim ve işlem hacmi (karşı para cinsinden). */
+  allTickers: (): Promise<Record<string, Ticker>> =>
+    cached('binance:tickers', 20_000, async () => {
+      const raw = await get<{ symbol: string; lastPrice: string; priceChangePercent: string; quoteVolume: string }[]>('/api/v3/ticker/24hr')
+      return Object.fromEntries(raw.map((t) => [t.symbol, { price: +t.lastPrice, change: +t.priceChangePercent, volume: +t.quoteVolume }]))
+    }),
+
   async getQuotes(symbols: string[]): Promise<Record<string, Quote>> {
     if (!symbols.length) return {}
+    if (symbols.length > BULK) {
+      const all = await BinanceAdapter.allTickers()
+      return Object.fromEntries(symbols.filter((s) => all[s]).map((s) => [s, all[s]]))
+    }
     const raw = await get<{ symbol: string; lastPrice: string; priceChangePercent: string }[]>(
       `/api/v3/ticker/24hr?symbols=${encodeURIComponent(JSON.stringify(symbols))}`,
     )

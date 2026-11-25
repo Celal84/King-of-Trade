@@ -34,8 +34,26 @@ export const SYMBOLS: SymbolInfo[] = [
 
 const BY_SYMBOL = new Map(SYMBOLS.map((s) => [s.symbol, s]))
 
+export const CRYPTO_QUOTES = ['USDT', 'TRY', 'USDC', 'FDUSD'] as const
+const CRYPTO_RE = /^([A-Z0-9]{2,15})(USDT|USDC|FDUSD|TRY)$/
+const crypto = (symbol: string): SymbolInfo | undefined => {
+  const m = CRYPTO_RE.exec(symbol)
+  return m ? mk(symbol, `${m[1]}/${m[2]}`, 'KRIPTO', 'binance', m[2] === 'TRY' ? 'TRY' : 'USDT') : undefined
+}
+
+/** Binance'ten gelen pariteleri arama ve listelerde kullanılabilir yapar. */
+export function registerCrypto(codes: string[]): number {
+  for (const c of codes) {
+    const info = !BY_SYMBOL.has(c) && crypto(c)
+    if (!info) continue
+    SYMBOLS.push(info)
+    BY_SYMBOL.set(c, info)
+  }
+  return SYMBOLS.length
+}
+
 export const getSymbol = (symbol: string): SymbolInfo =>
-  BY_SYMBOL.get(symbol) ?? mk(symbol, symbol, 'BIST', 'yahoo', 'TRY')
+  BY_SYMBOL.get(symbol) ?? crypto(symbol) ?? mk(symbol, symbol, 'BIST', 'yahoo', 'TRY')
 
 export const isIndex = (symbol: string) => getSymbol(symbol).sector === 'Endeks'
 

@@ -41,7 +41,4 @@ export const SENTETIK: [string, string, Cur][] = [
   ['XU100EUR', 'BIST 100 (EUR)', 'USD'], ['BRENTTRY', 'Brent Petrol (TL)', 'TRY'],
 ]
 
-export const KRIPTO = [
-  'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'AVAXUSDT', 'DOGEUSDT', 'ADAUSDT', 'LINKUSDT', 'DOTUSDT', 'TRXUSDT', 'LTCUSDT',
-  'PAXGUSDT', 'BTCTRY', 'ETHTRY', 'USDTTRY',
-]
+export const KRIPTO = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'PAXGUSDT', 'BTCTRY', 'ETHTRY', 'USDTTRY']

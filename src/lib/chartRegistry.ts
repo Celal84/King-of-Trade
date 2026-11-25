@@ -10,6 +10,10 @@ export interface PaneApi {
   reset: () => void
   /** Zaman dilimini ayarlar ve son `ms` süreyi ekrana sığdırır. */
   fit: (ms: number, tf: Timeframe) => void
+  undo: () => void
+  screenshot: () => void
+  /** Etkin indikatörün geçerli parametreleri ve çizgi sayısı. */
+  indicatorInfo: (name: string) => { params: number[]; lines: number } | null
 }
 
 export const paneApis = new Map<number, PaneApi>()

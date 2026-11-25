@@ -1,9 +1,9 @@
 export type Category = 'BIST' | 'EMTIA' | 'SENTETIK' | 'KRIPTO'
 export type Source = 'binance' | 'yahoo' | 'synthetic'
 export type Currency = 'TRY' | 'USD' | 'USDT'
-export type Timeframe = '1m' | '5m' | '15m' | '1h' | '4h' | '1d' | '1w'
+export type Timeframe = '1m' | '5m' | '15m' | '30m' | '1h' | '2h' | '4h' | '1d' | '1w' | '1M'
 export type CandleKind = 'candle' | 'hollow' | 'heikin' | 'line' | 'area'
-export type Layout = '1x1' | '1x2' | '2x2'
+export type Layout = '1x1' | '1x2' | '1x3' | '2x2' | '2x3'
 export type Ccy = 'ORG' | 'TRY' | 'USD' | 'EUR'
 
 export interface SymbolInfo {
@@ -47,4 +47,4 @@ export interface Universe {
   s: Record<string, (number | null)[]>
 }
 
-export const TIMEFRAMES: Timeframe[] = ['1m', '5m', '15m', '1h', '4h', '1d', '1w']
+export const TIMEFRAMES: Timeframe[] = ['1m', '5m', '15m', '30m', '1h', '2h', '4h', '1d', '1w', '1M']

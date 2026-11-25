@@ -10,10 +10,17 @@ export function heikinAshi(list: Candle[]): Candle[] {
   return out
 }
 
-export function aggregate(list: Candle[], ms: number, offset = 0): Candle[] {
+export type Bucket = (timestamp: number) => number
+export const bucket = (ms: number, offset = 0): Bucket => (t) => Math.floor((t - offset) / ms) * ms + offset
+export const monthBucket: Bucket = (t) => {
+  const d = new Date(t)
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)
+}
+
+export function aggregate(list: Candle[], by: Bucket): Candle[] {
   const out: Candle[] = []
   for (const c of list) {
-    const t = Math.floor((c.timestamp - offset) / ms) * ms + offset
+    const t = by(c.timestamp)
     const last = out[out.length - 1]
     if (last && last.timestamp === t) {
       last.high = Math.max(last.high, c.high)

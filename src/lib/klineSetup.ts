@@ -1,4 +1,5 @@
-import { registerIndicator, registerLocale, registerOverlay, type DeepPartial, type Styles } from 'klinecharts'
+import { registerIndicator, registerLocale, registerOverlay, type Coordinate, type DeepPartial, type OverlayTemplate, type Styles } from 'klinecharts'
+import type { Candle } from '../types'
 
 export const UP = '#26a69a'
 export const DOWN = '#ef5350'
@@ -24,6 +25,64 @@ export const DARK: DeepPartial<Styles> = {
   separator: { color: LINE },
   crosshair: { horizontal: cross, vertical: cross },
 }
+
+export const lineStyle = (color: string, size = 1) => ({ style: 'solid', smooth: false, size, dashedValue: [2, 2], color })
+export const COMPARE_SLOTS = ['CMP1', 'CMP2', 'CMP3', 'CMP4']
+export const COMPARE_COLORS = ['#f0b90b', '#e040fb', '#00bcd4', '#ff7043']
+const FILL = 'rgba(41,98,255,0.15)'
+const ACC = '#2962ff'
+const shape = { needDefaultPointFigure: true, needDefaultXAxisFigure: true, needDefaultYAxisFigure: true }
+const poly = (coordinates: Coordinate[]) => ({ type: 'polygon', attrs: { coordinates }, styles: { style: 'stroke_fill', color: FILL, borderColor: ACC, borderSize: 1 } })
+const label = (x: number, y: number, text: string, bg: string, baseline = 'bottom') => ({
+  type: 'text', ignoreEvent: true, attrs: { x, y, text, align: 'left', baseline },
+  styles: { color: '#fff', size: 11, backgroundColor: bg, borderSize: 0, paddingLeft: 4, paddingRight: 4, paddingTop: 2, paddingBottom: 2 },
+})
+
+const SHAPES: OverlayTemplate[] = [
+  {
+    name: 'kotRect', totalStep: 3, ...shape,
+    createPointFigures: ({ coordinates: [a, b] }) => (b ? poly([a, { x: b.x, y: a.y }, b, { x: a.x, y: b.y }]) : []),
+  },
+  {
+    name: 'kotTriangle', totalStep: 4, ...shape,
+    createPointFigures: ({ coordinates }) => (coordinates.length > 1 ? poly(coordinates) : []),
+  },
+  {
+    name: 'kotCircle', totalStep: 3, ...shape,
+    createPointFigures: ({ coordinates: [a, b] }) =>
+      b ? { type: 'circle', attrs: { x: a.x, y: a.y, r: Math.hypot(b.x - a.x, b.y - a.y) }, styles: { style: 'stroke_fill', color: FILL, borderColor: ACC, borderSize: 1 } } : [],
+  },
+  {
+    name: 'kotArrow', totalStep: 3, ...shape,
+    createPointFigures: ({ coordinates: [a, b] }) => {
+      if (!b) return []
+      const ang = Math.atan2(b.y - a.y, b.x - a.x)
+      const head = [0.4, -0.4].map((d) => ({ x: b.x - 12 * Math.cos(ang + d), y: b.y - 12 * Math.sin(ang + d) }))
+      return [
+        { type: 'line', attrs: { coordinates: [a, b] }, styles: { color: ACC, size: 2 } },
+        { type: 'polygon', ignoreEvent: true, attrs: { coordinates: [b, ...head] }, styles: { style: 'fill', color: ACC } },
+      ]
+    },
+  },
+  {
+    // 1: giriş, 2: hedef, 3: zarar durdur → hedef girişin üstündeyse alış, altındaysa satış pozisyonu
+    name: 'kotPosition', totalStep: 4, ...shape,
+    createPointFigures: ({ overlay, coordinates }) => {
+      const [e, t, s] = coordinates
+      if (!t) return []
+      const [pe, pt, ps] = overlay.points.map((p) => p.value ?? 0)
+      const x2 = Math.max(e.x + 140, t.x, s?.x ?? 0)
+      const box = (y: number, color: string) => ({
+        type: 'rect', attrs: { x: e.x, y: Math.min(e.y, y), width: x2 - e.x, height: Math.abs(y - e.y) }, styles: { style: 'fill', color },
+      })
+      const pct = (v: number) => `${(((v - pe) / pe) * 100).toFixed(2)}%`
+      const figs = [box(t.y, 'rgba(38,166,154,0.25)'), label(e.x, t.y, `Hedef ${pct(pt)}`, UP, t.y < e.y ? 'bottom' : 'top')]
+      if (!s) return figs
+      const rr = Math.abs(pt - pe) / Math.abs(pe - ps || 1)
+      return [...figs, box(s.y, 'rgba(239,83,80,0.25)'), label(e.x, s.y, `Stop ${pct(ps)} · R/R ${rr.toFixed(2)}`, DOWN, s.y > e.y ? 'top' : 'bottom')]
+    },
+  },
+]
 
 let done = false
 
@@ -53,6 +112,30 @@ export function setupKline() {
       })
     },
   })
+
+  SHAPES.forEach(registerOverlay)
+
+  COMPARE_SLOTS.forEach((name, i) =>
+    registerIndicator<{ v?: number }>({
+      name,
+      shortName: name,
+      calcParams: [],
+      figures: [{ key: 'v', title: '', type: 'line' }],
+      styles: { lines: [lineStyle(COMPARE_COLORS[i], 2)] } as never,
+      // Karşılaştırılan sembol, ilk ortak mumda ana sembolün fiyatına eşitlenerek çizilir
+      calc: (list, ind) => {
+        const other = ((ind.extendData as { list?: Candle[] } | undefined)?.list ?? [])
+        let j = -1
+        let ratio: number | undefined
+        return list.map((k) => {
+          while (j + 1 < other.length && other[j + 1].timestamp <= k.timestamp) j++
+          if (j < 0) return {}
+          ratio ??= k.close / other[j].close
+          return { v: other[j].close * ratio }
+        })
+      },
+    }),
+  )
 
   registerOverlay({
     name: 'kotText',
