@@ -110,13 +110,16 @@ const Live = {
   },
 }
 
+const BULK = 40
 const notEmpty = (v: object) => (Array.isArray(v) ? v.length > 0 : Object.keys(v).length > 0)
 
 export const YahooAdapter = {
   getCandles: (symbol: string, tf: Timeframe): Promise<Candle[]> =>
     withFallback(() => Live.getCandles(symbol, tf), () => Snapshot.getCandles(symbol, tf), notEmpty),
   getQuotes: (symbols: string[]): Promise<Record<string, Quote>> =>
-    withFallback(() => Live.getQuotes(symbols), () => Snapshot.getQuotes(symbols), notEmpty),
+    symbols.length > BULK
+      ? Snapshot.getQuotes(symbols).catch(() => Live.getQuotes(symbols))
+      : withFallback(() => Live.getQuotes(symbols), () => Snapshot.getQuotes(symbols), notEmpty),
   getFundamentals: (symbol: string): Promise<Fundamentals> =>
-    withFallback(() => Live.getFundamentals(symbol), () => Snapshot.getFundamentals(symbol), (f) => f.price !== undefined || f.pe !== undefined),
+    Snapshot.getFundamentals(symbol).catch(() => Live.getFundamentals(symbol)),
 }

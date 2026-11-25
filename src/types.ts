@@ -4,6 +4,7 @@ export type Currency = 'TRY' | 'USD' | 'USDT'
 export type Timeframe = '1m' | '5m' | '15m' | '1h' | '4h' | '1d' | '1w'
 export type CandleKind = 'candle' | 'hollow' | 'heikin' | 'line' | 'area'
 export type Layout = '1x1' | '1x2' | '2x2'
+export type Ccy = 'ORG' | 'TRY' | 'USD' | 'EUR'
 
 export interface SymbolInfo {
   symbol: string
@@ -36,6 +37,14 @@ export interface Fundamentals {
   low52?: number
   price?: number
   currency?: string
+  stats?: Record<string, number | null>
+}
+
+export interface Universe {
+  t: number
+  cols: string[]
+  idx: Record<string, string[]>
+  s: Record<string, (number | null)[]>
 }
 
 export const TIMEFRAMES: Timeframe[] = ['1m', '5m', '15m', '1h', '4h', '1d', '1w']

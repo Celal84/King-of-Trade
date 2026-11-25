@@ -1,9 +1,10 @@
 import { useApp, type PanelTab } from '../store/app'
 import Watchlist from './Watchlist'
+import Screener from './Screener'
 import Fundamentals from './Fundamentals'
 import PaperTrading from './PaperTrading'
 
-export const PANEL_TABS: [PanelTab, string][] = [['watch', 'İzleme Listesi'], ['fund', 'Temel Analiz'], ['paper', 'Paper Trading']]
+export const PANEL_TABS: [PanelTab, string][] = [['watch', 'İzleme'], ['scan', 'Tarama'], ['fund', 'Temel'], ['paper', 'Portföy']]
 
 export default function RightPanel({ onPick }: { onPick?: () => void }) {
   const { tab, set } = useApp()
@@ -14,6 +15,7 @@ export default function RightPanel({ onPick }: { onPick?: () => void }) {
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto">
         {tab === 'watch' && <Watchlist onPick={onPick} />}
+        {tab === 'scan' && <Screener onPick={onPick} />}
         {tab === 'fund' && <Fundamentals />}
         {tab === 'paper' && <PaperTrading />}
       </div>

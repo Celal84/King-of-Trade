@@ -4,6 +4,7 @@ import DrawingToolbar from './components/DrawingToolbar'
 import ChartGrid from './components/ChartGrid'
 import RightPanel from './components/RightPanel'
 import ReplayBar from './components/ReplayBar'
+import BottomBar from './components/BottomBar'
 import MobileNav from './components/MobileNav'
 import SymbolSearch from './components/SymbolSearch'
 import IndicatorMenu from './components/IndicatorMenu'
@@ -43,13 +44,14 @@ export default function App() {
       <div className="flex flex-1 min-h-0 relative">
         <DrawingToolbar />
         <ChartGrid mobile={mobile} />
-        {!mobile && <aside className="w-80 border-l border-line shrink-0"><RightPanel /></aside>}
+        {!mobile && <aside className="w-[340px] border-l border-line shrink-0"><RightPanel /></aside>}
         {mobile && drawer && (
           <div className="absolute inset-x-0 bottom-0 h-[70%] z-40 border-t border-line rounded-t-xl overflow-hidden shadow-2xl">
             <RightPanel onPick={() => setDrawer(false)} />
           </div>
         )}
       </div>
+      <BottomBar />
       {mobile && <MobileNav drawer={drawer} setDrawer={setDrawer} onAlerts={() => setModal('alerts')} />}
       {modal === 'search' && <SymbolSearch onClose={close} />}
       {modal === 'indicators' && <IndicatorMenu onClose={close} />}

@@ -2,9 +2,10 @@ import type { Candle, Quote, Timeframe } from '../types'
 import { SYNTHETIC, type SyntheticDef } from '../data/symbols'
 import { YahooAdapter } from './YahooAdapter'
 
-const apply = (d: SyntheticDef, a: number, b: number) => (d.op === 'mul' ? (a * b) / d.k : a / b / d.k)
+type Op = Pick<SyntheticDef, 'op' | 'k'>
+const apply = (d: Op, a: number, b: number) => (d.op === 'mul' ? (a * b) / d.k : a / b / d.k)
 
-function combine(d: SyntheticDef, as: Candle[], bs: Candle[]): Candle[] {
+export function combine(d: Op, as: Candle[], bs: Candle[]): Candle[] {
   const out: Candle[] = []
   let j = 0
   for (const a of as) {

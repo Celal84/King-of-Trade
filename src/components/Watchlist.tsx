@@ -1,22 +1,36 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Star } from 'lucide-react'
-import { SYMBOLS, displayName } from '../data/symbols'
+import { INDEX_LIST, INDEX_MEMBERS, SYMBOLS, displayName, isIndex } from '../data/symbols'
 import { useApp } from '../store/app'
 import { fmt } from '../lib/candles'
 import type { Category } from '../types'
 
-const TABS: [Category | 'FAV', string][] = [['FAV', 'Favoriler'], ['BIST', 'BIST'], ['EMTIA', 'Emtia'], ['SENTETIK', 'Sentetik'], ['KRIPTO', 'Kripto']]
+const TABS: [Category | 'FAV', string][] = [['FAV', 'Favoriler'], ['BIST', 'BIST'], ['EMTIA', 'Emtia & Döviz'], ['SENTETIK', 'Sentetik'], ['KRIPTO', 'Kripto']]
 
 export default function Watchlist({ onPick }: { onPick?: () => void }) {
   const [tab, setTab] = useState<Category | 'FAV'>('FAV')
+  const [group, setGroup] = useState('XU030')
   const { favorites, prices, panes, active, setSymbol, toggleFavorite, set } = useApp()
-  const list = useMemo(() => (tab === 'FAV' ? SYMBOLS.filter((s) => favorites.includes(s.symbol)) : SYMBOLS.filter((s) => s.category === tab)), [tab, favorites])
+  const list = useMemo(() => {
+    if (tab === 'FAV') return SYMBOLS.filter((s) => favorites.includes(s.symbol))
+    if (tab !== 'BIST') return SYMBOLS.filter((s) => s.category === tab)
+    if (group === 'INDEX') return SYMBOLS.filter((s) => isIndex(s.symbol))
+    const members = group === 'ALL' ? null : INDEX_MEMBERS[group]
+    return SYMBOLS.filter((s) => s.category === 'BIST' && !isIndex(s.symbol) && (!members || members.has(s.symbol)))
+  }, [tab, favorites, group])
   useEffect(() => set({ watchSymbols: list.map((s) => s.symbol) }), [list, set])
   return (
     <div className="flex flex-col min-h-0 h-full">
       <div className="flex overflow-x-auto no-scrollbar border-b border-line shrink-0">
         {TABS.map(([k, l]) => <button key={k} className={`tab ${tab === k ? 'tab-on' : ''}`} onClick={() => setTab(k)}>{l}</button>)}
       </div>
+      {tab === 'BIST' && (
+        <select className="inp h-7 text-xs rounded-none border-x-0 border-t-0 shrink-0" value={group} onChange={(e) => setGroup(e.target.value)}>
+          <option value="INDEX">Endeksler</option>
+          <option value="ALL">Tüm hisseler ({SYMBOLS.filter((s) => s.category === 'BIST').length - INDEX_LIST.length})</option>
+          {INDEX_LIST.map(([c, n]) => <option key={c} value={c}>{n} ({INDEX_MEMBERS[c].size})</option>)}
+        </select>
+      )}
       <ul className="overflow-y-auto flex-1">
         {list.length === 0 && <li className="p-3 text-xs text-mute">Favori yok. Yıldız ile ekleyin.</li>}
         {list.map((s) => {

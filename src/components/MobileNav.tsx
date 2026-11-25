@@ -1,4 +1,4 @@
-import { Bell, CandlestickChart, List, PieChart, Wallet } from 'lucide-react'
+import { Bell, CandlestickChart, List, PieChart, ScanSearch, Wallet } from 'lucide-react'
 import { useApp, type PanelTab } from '../store/app'
 
 interface Props {
@@ -22,6 +22,7 @@ export default function MobileNav({ drawer, setDrawer, onAlerts }: Props) {
     <nav className="flex h-14 bg-panel border-t border-line shrink-0">
       {item(!drawer, 'Grafik', CandlestickChart, () => setDrawer(false))}
       {item(drawer && tab === 'watch', 'Liste', List, () => open('watch'))}
+      {item(drawer && tab === 'scan', 'Tarama', ScanSearch, () => open('scan'))}
       {item(drawer && tab === 'fund', 'Temel', PieChart, () => open('fund'))}
       {item(drawer && tab === 'paper', 'Portföy', Wallet, () => open('paper'))}
       {item(false, 'Alarm', Bell, onAlerts)}

@@ -1,8 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { CandleKind, Layout, Quote, Timeframe } from '../types'
+import type { CandleKind, Ccy, Layout, Quote, Timeframe } from '../types'
 
-export type PanelTab = 'watch' | 'fund' | 'paper'
+export type PanelTab = 'watch' | 'scan' | 'fund' | 'paper'
 
 interface Settings {
   proxyUrl: string
@@ -17,6 +17,7 @@ interface AppState {
   tf: Timeframe
   candleKind: CandleKind
   logScale: boolean
+  ccy: Ccy
   indicators: string[]
   magnet: boolean
   drawingsVisible: boolean
@@ -28,7 +29,7 @@ interface AppState {
   snapshotAt: number | null
   setSymbol: (s: string) => void
   setActive: (i: number) => void
-  set: (p: Partial<Pick<AppState, 'layout' | 'tf' | 'candleKind' | 'logScale' | 'magnet' | 'drawingsVisible' | 'tab' | 'watchSymbols' | 'snapshotAt'>>) => void
+  set: (p: Partial<Pick<AppState, 'layout' | 'tf' | 'ccy' | 'candleKind' | 'logScale' | 'magnet' | 'drawingsVisible' | 'tab' | 'watchSymbols' | 'snapshotAt'>>) => void
   toggleIndicator: (n: string) => void
   toggleFavorite: (s: string) => void
   setSettings: (s: Partial<Settings>) => void
@@ -44,6 +45,7 @@ export const useApp = create<AppState>()(
       tf: '1d',
       candleKind: 'candle',
       logScale: false,
+      ccy: 'ORG',
       indicators: ['VOL'],
       magnet: false,
       drawingsVisible: true,
