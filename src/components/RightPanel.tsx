@@ -1,0 +1,22 @@
+import { useApp, type PanelTab } from '../store/app'
+import Watchlist from './Watchlist'
+import Fundamentals from './Fundamentals'
+import PaperTrading from './PaperTrading'
+
+export const PANEL_TABS: [PanelTab, string][] = [['watch', 'İzleme Listesi'], ['fund', 'Temel Analiz'], ['paper', 'Paper Trading']]
+
+export default function RightPanel({ onPick }: { onPick?: () => void }) {
+  const { tab, set } = useApp()
+  return (
+    <div className="flex flex-col h-full min-h-0 bg-panel">
+      <div className="flex border-b border-line shrink-0">
+        {PANEL_TABS.map(([k, l]) => <button key={k} className={`tab flex-1 ${tab === k ? 'tab-on' : ''}`} onClick={() => set({ tab: k })}>{l}</button>)}
+      </div>
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        {tab === 'watch' && <Watchlist onPick={onPick} />}
+        {tab === 'fund' && <Fundamentals />}
+        {tab === 'paper' && <PaperTrading />}
+      </div>
+    </div>
+  )
+}

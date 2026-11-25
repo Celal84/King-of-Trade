@@ -1,0 +1,208 @@
+import { useEffect, useRef, useState } from 'react'
+import { ActionType, CandleType, OverlayMode, YAxisType, dispose, init, type Chart, type OverlayCreate } from 'klinecharts'
+import type { Candle, CandleKind } from '../types'
+import { MarketRouter } from '../adapters/MarketRouter'
+import { useApp } from '../store/app'
+import { useReplay } from '../store/replay'
+import { heikinAshi, mergeCandle, fmt } from '../lib/candles'
+import { DARK, MAIN_PANE_INDICATORS, UP, DOWN, setupKline } from '../lib/klineSetup'
+import { paneApis } from '../lib/chartRegistry'
+import { loadDrawings, saveDrawings } from '../lib/drawings'
+import { displayName, getSymbol } from '../data/symbols'
+
+const GROUP = 'drawings'
+const view = (l: Candle[]) => (useApp.getState().candleKind === 'heikin' ? heikinAshi(l) : l)
+const precisionOf = (p = 1) => (p < 1 ? 6 : p < 10 ? 4 : 2)
+
+const CANDLE_STYLE: Record<CandleKind, object> = {
+  candle: { type: CandleType.CandleSolid },
+  heikin: { type: CandleType.CandleSolid },
+  hollow: { type: CandleType.CandleUpStroke },
+  line: { type: CandleType.Area, area: { lineColor: '#2962ff', lineSize: 2, backgroundColor: [{ offset: 0, color: 'rgba(0,0,0,0)' }, { offset: 1, color: 'rgba(0,0,0,0)' }] } },
+  area: { type: CandleType.Area, area: { lineColor: '#2962ff', lineSize: 2, backgroundColor: [{ offset: 0, color: 'rgba(41,98,255,0.01)' }, { offset: 1, color: 'rgba(41,98,255,0.35)' }] } },
+}
+
+export default function ChartPane({ index }: { index: number }) {
+  const el = useRef<HTMLDivElement>(null)
+  const chart = useRef<Chart | null>(null)
+  const raw = useRef<Candle[]>([])
+  const ids = useRef(new Set<string>())
+  const indis = useRef(new Map<string, string>())
+  const hover = useRef<number | null>(null)
+  const restoring = useRef(false)
+  const symRef = useRef('')
+  const [status, setStatus] = useState<'loading' | 'ok' | 'error'>('loading')
+  const symbol = useApp((s) => s.panes[index])
+  const tf = useApp((s) => s.tf)
+  const kind = useApp((s) => s.candleKind)
+  const log = useApp((s) => s.logScale)
+  const indicators = useApp((s) => s.indicators)
+  const magnet = useApp((s) => s.magnet)
+  const visible = useApp((s) => s.drawingsVisible)
+  const isActive = useApp((s) => s.active === index)
+  const quote = useApp((s) => s.prices[symbol])
+  symRef.current = symbol
+
+  const save = () => {
+    const c = chart.current
+    if (!c || restoring.current) return
+    const list = [...ids.current].flatMap((id) => {
+      const o = c.getOverlayById(id)
+      return o ? [{ name: o.name, points: o.points.map((p) => ({ timestamp: p.timestamp ?? 0, value: p.value ?? 0 })), extendData: o.extendData }] : []
+    })
+    saveDrawings(symRef.current, list)
+  }
+
+  const create = (o: Partial<OverlayCreate> & { name: string }) => {
+    const { magnet: m, drawingsVisible: v } = useApp.getState()
+    const id = chart.current?.createOverlay({
+      ...o,
+      groupId: GROUP,
+      mode: m ? OverlayMode.WeakMagnet : OverlayMode.Normal,
+      visible: v,
+      onDrawEnd: () => (save(), false),
+      onPressedMoveEnd: () => (save(), false),
+      onRemoved: (e) => (ids.current.delete(e.overlay.id), save(), false),
+    })
+    if (typeof id === 'string') ids.current.add(id)
+  }
+
+  const restore = () => {
+    const c = chart.current
+    if (!c) return
+    restoring.current = true
+    ids.current.clear()
+    c.removeOverlay({ groupId: GROUP })
+    loadDrawings(symRef.current).forEach((d) => create(d))
+    restoring.current = false
+  }
+
+  useEffect(() => {
+    setupKline()
+    const c = init(el.current!, { styles: DARK, locale: 'tr-TR' })!
+    chart.current = c
+    c.subscribeAction(ActionType.OnCrosshairChange, (d) => {
+      hover.current = (d as { dataIndex?: number }).dataIndex ?? null
+    })
+    const ro = new ResizeObserver(() => c.resize())
+    ro.observe(el.current!)
+    paneApis.set(index, {
+      draw: (name) => {
+        if (name === 'kotText') {
+          const text = window.prompt('Metin:')
+          if (text) create({ name, extendData: text })
+        } else create({ name })
+      },
+      clear: () => {
+        ids.current.clear()
+        c.removeOverlay({ groupId: GROUP })
+        saveDrawings(symRef.current, [])
+      },
+    })
+    const unsubReplay = useReplay.subscribe((s, p) => {
+      if (s.pane !== index) return
+      const v = view(raw.current)
+      if (s.active && !p.active) useReplay.getState().set({ length: v.length })
+      else if (!s.active && p.active) c.applyNewData(v)
+      else if (s.active && s.cursor !== p.cursor && s.cursor >= 0) {
+        if (s.cursor === p.cursor + 1 && p.cursor >= 0) c.updateData(v[s.cursor])
+        else c.applyNewData(v.slice(0, s.cursor + 1))
+      }
+    })
+    return () => {
+      unsubReplay()
+      ro.disconnect()
+      paneApis.delete(index)
+      dispose(c)
+    }
+  }, [index])
+
+  useEffect(() => {
+    const c = chart.current!
+    let alive = true
+    let unsub = () => {}
+    setStatus('loading')
+    MarketRouter.getCandles(symbol, tf)
+      .then((list) => {
+        if (!alive) return
+        raw.current = list
+        c.setPriceVolumePrecision(precisionOf(list.at(-1)?.close), 2)
+        c.applyNewData(view(list))
+        restore()
+        setStatus(list.length ? 'ok' : 'error')
+        unsub = MarketRouter.subscribe(symbol, tf, (k) => {
+          raw.current = mergeCandle(raw.current, k)
+          const st = useApp.getState()
+          st.setPrices({ [symbol]: { price: k.close, change: st.prices[symbol]?.change ?? 0 } })
+          const r = useReplay.getState()
+          if (r.active && r.pane === index) return
+          c.updateData(view(raw.current).at(-1)!)
+        })
+      })
+      .catch(() => alive && setStatus('error'))
+    return () => {
+      alive = false
+      unsub()
+    }
+  }, [symbol, tf, index])
+
+  useEffect(() => {
+    chart.current?.setStyles({ candle: CANDLE_STYLE[kind] })
+    if (raw.current.length && !useReplay.getState().active) chart.current?.applyNewData(view(raw.current))
+  }, [kind])
+
+  useEffect(() => {
+    chart.current?.setStyles({ yAxis: { type: log ? YAxisType.Log : YAxisType.Normal } })
+  }, [log])
+
+  const syncIndicators = () => {
+    const c = chart.current
+    if (!c) return
+    const want = useApp.getState().indicators
+    indis.current.forEach((pane, name) => {
+      if (!want.includes(name)) {
+        c.removeIndicator(pane, name)
+        indis.current.delete(name)
+      }
+    })
+    want.forEach((name) => {
+      if (indis.current.has(name)) return
+      const main = MAIN_PANE_INDICATORS.includes(name)
+      const pane = c.createIndicator(name, main, main ? { id: 'candle_pane' } : { height: 90 })
+      if (pane) indis.current.set(name, pane)
+    })
+  }
+
+  useEffect(syncIndicators, [indicators])
+
+  useEffect(() => {
+    chart.current?.overrideOverlay({ groupId: GROUP, visible, mode: magnet ? OverlayMode.WeakMagnet : OverlayMode.Normal })
+  }, [visible, magnet])
+
+  const onClick = () => {
+    useApp.getState().setActive(index)
+    const r = useReplay.getState()
+    if (r.active && r.selecting && r.pane === index && hover.current !== null) r.set({ cursor: hover.current, selecting: false })
+  }
+
+  const info = getSymbol(symbol)
+  return (
+    <div onClick={onClick} className={`relative flex flex-col min-h-0 min-w-0 bg-bg border ${isActive ? 'border-acc/60' : 'border-transparent'}`}>
+      <div className="flex items-center gap-2 px-2 h-6 text-xs shrink-0">
+        <span className="font-semibold text-txt">{displayName(symbol)}</span>
+        <span className="text-mute truncate">{info.name} · {tf}</span>
+        {quote && (
+          <span className={`ml-auto ${quote.change >= 0 ? 'text-up' : 'text-down'}`} style={{ color: quote.change >= 0 ? UP : DOWN }}>
+            {fmt(quote.price)} ({quote.change >= 0 ? '+' : ''}{fmt(quote.change, 2)}%)
+          </span>
+        )}
+      </div>
+      <div ref={el} className="flex-1 min-h-0" />
+      {status !== 'ok' && (
+        <div className="absolute inset-0 top-6 flex items-center justify-center text-mute text-sm pointer-events-none">
+          {status === 'loading' ? 'Yükleniyor…' : 'Veri alınamadı. Ayarlar’dan Proxy URL girmeyi deneyin.'}
+        </div>
+      )}
+    </div>
+  )
+}
