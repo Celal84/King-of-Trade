@@ -1,13 +1,14 @@
 import type { Candle, Fundamentals, Quote, Timeframe } from '../types'
-import { aggregate } from '../lib/candles'
+import { aggregate, bucket } from '../lib/candles'
 import { hasLiveSource, proxiedJson } from './http'
 import { Snapshot } from './snapshot'
 import { useApp } from '../store/app'
 
 const BASE = 'https://query1.finance.yahoo.com'
-const PARAMS: Record<Timeframe, [string, string]> = {
-  '1m': ['1m', '5d'], '5m': ['5m', '1mo'], '15m': ['15m', '1mo'], '1h': ['60m', '6mo'],
-  '4h': ['60m', '1y'], '1d': ['1d', '5y'], '1w': ['1wk', '10y'],
+const H = 3600_000
+const PARAMS: Record<Timeframe, [string, string, number?]> = {
+  '1m': ['1m', '5d'], '5m': ['5m', '1mo'], '15m': ['15m', '1mo'], '30m': ['30m', '1mo'], '1h': ['60m', '6mo'], '2h': ['60m', '6mo', 2 * H],
+  '4h': ['60m', '1y', 4 * H], '1d': ['1d', '10y'], '1w': ['1wk', 'max'], '1M': ['1mo', 'max'],
 }
 
 interface ChartMeta {
@@ -58,7 +59,7 @@ async function withFallback<T>(live: () => Promise<T>, snap: () => Promise<T>, v
 
 const Live = {
   async getCandles(symbol: string, tf: Timeframe): Promise<Candle[]> {
-    const [interval, range] = PARAMS[tf]
+    const [interval, range, agg] = PARAMS[tf]
     const r = await chart(symbol, interval, range)
     const q = r.indicators.quote[0]
     const out: Candle[] = []
@@ -69,7 +70,7 @@ const Live = {
       if (o == null || h == null || l == null || c == null) return
       out.push({ timestamp: t * 1000, open: o, high: Math.max(h, c), low: Math.min(l, c), close: c, volume: q.volume[i] ?? 0 })
     })
-    return tf === '4h' ? aggregate(out, 4 * 3600_000) : out
+    return agg ? aggregate(out, bucket(agg)) : out
   },
 
   async getQuotes(symbols: string[]): Promise<Record<string, Quote>> {

@@ -1,4 +1,4 @@
-import { ChevronsRight, FoldVertical, RotateCcw, UnfoldVertical, ZoomIn, ZoomOut } from 'lucide-react'
+import { Camera, ChevronsRight, FoldVertical, Maximize, RotateCcw, UnfoldVertical, ZoomIn, ZoomOut } from 'lucide-react'
 import { useApp } from '../store/app'
 import { paneApis } from '../lib/chartRegistry'
 import type { Timeframe } from '../types'
@@ -32,6 +32,8 @@ export default function BottomBar() {
         <button className={`btn px-1.5 ${logScale ? 'btn-on' : ''}`} title="Logaritmik ölçek" onClick={() => set({ logScale: !logScale })}>Log</button>
         {icon('Son muma git', ChevronsRight, () => api()?.toLatest())}
         {icon('Görünümü sıfırla', RotateCcw, () => api()?.reset())}
+        {icon('Grafiği resim olarak kaydet', Camera, () => api()?.screenshot())}
+        {icon('Tam ekran', Maximize, () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.()))}
       </div>
     </footer>
   )

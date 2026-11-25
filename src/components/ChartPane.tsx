@@ -5,12 +5,13 @@ import { MarketRouter } from '../adapters/MarketRouter'
 import { useApp } from '../store/app'
 import { useReplay } from '../store/replay'
 import { heikinAshi, mergeCandle, fmt } from '../lib/candles'
-import { DARK, MAIN_PANE_INDICATORS, UP, DOWN, setupKline } from '../lib/klineSetup'
+import { COMPARE_COLORS, COMPARE_SLOTS, DARK, lineStyle, MAIN_PANE_INDICATORS, UP, DOWN, setupKline } from '../lib/klineSetup'
 import { paneApis } from '../lib/chartRegistry'
 import { loadDrawings, saveDrawings } from '../lib/drawings'
 import { displayName, getSymbol } from '../data/symbols'
 
 const GROUP = 'drawings'
+const TEXT_TOOLS = ['kotText', 'simpleAnnotation', 'simpleTag']
 const view = (l: Candle[]) => (useApp.getState().candleKind === 'heikin' ? heikinAshi(l) : l)
 const precisionOf = (p = 1) => (p < 1 ? 6 : p < 10 ? 4 : 2)
 const DEFAULT_BAR = 8
@@ -52,6 +53,8 @@ export default function ChartPane({ index }: { index: number }) {
   const kind = useApp((s) => s.candleKind)
   const log = useApp((s) => s.logScale)
   const indicators = useApp((s) => s.indicators)
+  const indicatorConfig = useApp((s) => s.indicatorConfig)
+  const compare = useApp((s) => s.compare)
   const magnet = useApp((s) => s.magnet)
   const visible = useApp((s) => s.drawingsVisible)
   const isActive = useApp((s) => s.active === index)
@@ -136,7 +139,7 @@ export default function ChartPane({ index }: { index: number }) {
     ro.observe(el.current!)
     paneApis.set(index, {
       draw: (name) => {
-        if (name === 'kotText') {
+        if (TEXT_TOOLS.includes(name)) {
           const text = window.prompt('Metin:')
           if (text) create({ name, extendData: text })
         } else create({ name })
@@ -154,6 +157,21 @@ export default function ChartPane({ index }: { index: number }) {
         c.setBarSpace(DEFAULT_BAR)
         c.scrollToRealTime()
         autoPrice()
+      },
+      undo: () => {
+        const last = [...ids.current].at(-1)
+        if (last) c.removeOverlay(last)
+      },
+      screenshot: () => {
+        const a = document.createElement('a')
+        a.href = c.getConvertPictureUrl(true, 'png', '#131722')
+        a.download = `${displayName(symRef.current.replace(':', '_'))}_${useApp.getState().tf}.png`
+        a.click()
+      },
+      indicatorInfo: (name) => {
+        const pane = indis.current.get(name)
+        const ind = pane ? (c.getIndicatorByPaneId(pane, name) as { calcParams: number[]; figures: { type?: string }[] } | null) : null
+        return ind ? { params: ind.calcParams, lines: ind.figures.filter((f) => f.type === 'line').length } : null
       },
       fit: (ms: number, next: Timeframe) => {
         pendingFit.current = ms
@@ -225,8 +243,16 @@ export default function ChartPane({ index }: { index: number }) {
   }, [kind])
 
   useEffect(() => {
-    chart.current?.setStyles({ yAxis: { type: log ? YAxisType.Log : YAxisType.Normal } })
-  }, [log])
+    chart.current?.setStyles({ yAxis: { type: compare.length ? YAxisType.Percentage : log ? YAxisType.Log : YAxisType.Normal } })
+  }, [log, compare.length])
+
+  const configOf = (name: string) => {
+    const cfg = useApp.getState().indicatorConfig[name]
+    return {
+      ...(cfg?.params?.length ? { calcParams: cfg.params } : {}),
+      ...(cfg?.colors?.length ? { styles: { lines: cfg.colors.map((color) => lineStyle(color)) } as never } : {}),
+    }
+  }
 
   const syncIndicators = () => {
     const c = chart.current
@@ -241,12 +267,31 @@ export default function ChartPane({ index }: { index: number }) {
     want.forEach((name) => {
       if (indis.current.has(name)) return
       const main = MAIN_PANE_INDICATORS.includes(name)
-      const pane = c.createIndicator(name, main, main ? { id: 'candle_pane' } : { height: 90 })
+      const pane = c.createIndicator({ name, ...configOf(name) }, main, main ? { id: 'candle_pane' } : { height: 90 })
       if (pane) indis.current.set(name, pane)
     })
   }
 
   useEffect(syncIndicators, [indicators])
+
+  useEffect(() => {
+    indis.current.forEach((pane, name) => chart.current?.overrideIndicator({ name, ...configOf(name) }, pane))
+  }, [indicatorConfig])
+
+  useEffect(() => {
+    const c = chart.current
+    if (!c || status !== 'ok') return
+    let alive = true
+    COMPARE_SLOTS.forEach((n) => c.removeIndicator('candle_pane', n))
+    compare.filter((s) => s !== symbol).forEach((s, i) => {
+      MarketRouter.getCandles(s, tf, ccy)
+        .then((list) => alive && c.createIndicator({ name: COMPARE_SLOTS[i], shortName: displayName(s), extendData: { list } }, true, { id: 'candle_pane' }))
+        .catch(() => undefined)
+    })
+    return () => {
+      alive = false
+    }
+  }, [compare, symbol, tf, ccy, status])
 
   useEffect(() => {
     chart.current?.overrideOverlay({ groupId: GROUP, visible, mode: magnet ? OverlayMode.WeakMagnet : OverlayMode.Normal })
@@ -265,6 +310,10 @@ export default function ChartPane({ index }: { index: number }) {
       <div className="flex items-center gap-2 px-2 h-6 text-xs shrink-0">
         <span className="font-semibold text-txt">{displayName(symbol)}</span>
         <span className="text-mute truncate"><span className="hidden sm:inline">{info.name} · </span>{tf} · {shownCcy}</span>
+        {compare.filter((s) => s !== symbol).map((s, i) => (
+          <button key={s} className="whitespace-nowrap hover:line-through" style={{ color: COMPARE_COLORS[i] }} title="Karşılaştırmadan çıkar"
+            onClick={(e) => (e.stopPropagation(), useApp.getState().toggleCompare(s))}>● {displayName(s)}</button>
+        ))}
         {delayed && <span className="text-yellow-500 whitespace-nowrap" title="Proxy tanımlı değil: veriler periyodik anlık görüntüden gelir">⏱ gecikmeli · {new Date(snapshotAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span>}
         {converted && lastClose !== undefined && <span className="ml-auto whitespace-nowrap tabular-nums">{fmt(lastClose, precisionOf(lastClose))} {shownCcy}</span>}
         {quote && !converted && (

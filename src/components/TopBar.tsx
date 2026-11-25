@@ -1,4 +1,4 @@
-import { BarChart3, Bell, Crown, History, LayoutGrid, Search, Settings, Square, Columns2 } from 'lucide-react'
+import { BarChart3, Bell, Columns2, Columns3, Crown, GitCompareArrows, Grid3x3, History, LayoutGrid, Search, Settings, Square } from 'lucide-react'
 import pkg from '../../package.json'
 import { useApp } from '../store/app'
 import { useReplay } from '../store/replay'
@@ -7,17 +7,18 @@ import { TIMEFRAMES, type CandleKind, type Ccy, type Layout } from '../types'
 
 const KINDS: [CandleKind, string][] = [['candle', 'Mum'], ['hollow', 'Hollow'], ['heikin', 'Heikin Ashi'], ['line', 'Çizgi'], ['area', 'Alan']]
 const CCYS: [Ccy, string][] = [['ORG', 'Orijinal'], ['TRY', 'TL'], ['USD', 'USD'], ['EUR', 'EUR']]
-const LAYOUTS: [Layout, typeof Square][] = [['1x1', Square], ['1x2', Columns2], ['2x2', LayoutGrid]]
+const LAYOUTS: [Layout, typeof Square][] = [['1x1', Square], ['1x2', Columns2], ['1x3', Columns3], ['2x2', LayoutGrid], ['2x3', Grid3x3]]
 
 interface Props {
   onSearch: () => void
   onIndicators: () => void
+  onCompare: () => void
   onAlerts: () => void
   onSettings: () => void
 }
 
-export default function TopBar({ onSearch, onIndicators, onAlerts, onSettings }: Props) {
-  const { panes, active, tf, candleKind, ccy, layout, set } = useApp()
+export default function TopBar({ onSearch, onIndicators, onCompare, onAlerts, onSettings }: Props) {
+  const { panes, active, tf, candleKind, ccy, layout, compare, set } = useApp()
   const replay = useReplay()
   const toggleReplay = () =>
     replay.active ? replay.set({ active: false, playing: false, selecting: false, cursor: -1 }) : replay.set({ active: true, selecting: true, playing: false, cursor: -1, pane: active })
@@ -42,6 +43,7 @@ export default function TopBar({ onSearch, onIndicators, onAlerts, onSettings }:
         {KINDS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
       </select>
       <button className="btn" onClick={onIndicators}><BarChart3 size={14} /> İndikatör</button>
+      <button className={`btn ${compare.length ? 'btn-on' : ''}`} onClick={onCompare}><GitCompareArrows size={14} /> Karşılaştır{compare.length ? ` (${compare.length})` : ''}</button>
       <div className="hidden md:flex">
         {LAYOUTS.map(([l, I]) => (
           <button key={l} className={`btn ${layout === l ? 'btn-on' : ''}`} onClick={() => set({ layout: l })} title={l}><I size={14} /></button>
