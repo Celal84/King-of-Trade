@@ -6,14 +6,9 @@ import { useTickers } from '../hooks/useCrypto'
 import { useApp } from '../store/app'
 import { fmt, fmtBig } from '../lib/candles'
 import type { Universe } from '../types'
+import ScreenerFilters, { METRICS, passes } from './ScreenerFilters'
+import type { ScanRule } from '../store/app'
 
-type Fmt = 'pct' | 'big' | 'num'
-const METRICS: [string, string, Fmt][] = [
-  ['change', 'Günlük %', 'pct'], ['Perf.W', 'Haftalık %', 'pct'], ['Perf.1M', 'Aylık %', 'pct'], ['Perf.YTD', 'Yılbaşından %', 'pct'], ['Perf.Y', 'Yıllık %', 'pct'],
-  ['volume', 'Hacim (lot)', 'big'], ['relative_volume_10d_calc', 'Göreli Hacim', 'num'], ['market_cap_basic', 'Piyasa Değeri', 'big'],
-  ['price_earnings_ttm', 'F/K', 'num'], ['price_book_fq', 'PD/DD', 'num'], ['dividends_yield_current', 'Temettü Verimi %', 'num'],
-  ['RSI', 'RSI(14)', 'num'], ['return_on_equity', 'Özkaynak Kârlılığı %', 'num'], ['debt_to_equity', 'Borç/Özkaynak', 'num'],
-]
 const PRESETS: [string, string, boolean][] = [
   ['Yükselenler', 'change', true], ['Düşenler', 'change', false], ['Hacim Patlaması', 'relative_volume_10d_calc', true],
   ['Aşırı Satım', 'RSI', false], ['Aşırı Alım', 'RSI', true], ['Düşük F/K', 'price_earnings_ttm', false], ['Temettü', 'dividends_yield_current', true],
@@ -79,6 +74,7 @@ function BistScreener({ onPick }: { onPick?: () => void }) {
   const [group, setGroup] = useState('XU100')
   const [metric, setMetric] = useState('change')
   const [desc, setDesc] = useState(true)
+  const [rules, setRules] = useState<ScanRule[]>([])
   const setSymbol = useApp((s) => s.setSymbol)
   useEffect(() => {
     Snapshot.getUniverse().then(setUni, () => setErr(true))
@@ -88,11 +84,11 @@ function BistScreener({ onPick }: { onPick?: () => void }) {
     const [ci, pi, mi] = ['change', 'close', metric].map((c) => uni.cols.indexOf(c))
     const members = group === 'ALL' ? null : INDEX_MEMBERS[group]
     return Object.entries(uni.s)
-      .filter(([code, r]) => r[mi] != null && (!members || members.has(`${code}.IS`)) && (metric !== 'price_earnings_ttm' || (r[mi] as number) > 0))
+      .filter(([code, r]) => r[mi] != null && (!members || members.has(`${code}.IS`)) && (metric !== 'price_earnings_ttm' || (r[mi] as number) > 0) && passes(uni.cols, r, rules))
       .sort((a, b) => ((a[1][mi] as number) - (b[1][mi] as number)) * (desc ? -1 : 1))
       .slice(0, LIMIT)
       .map(([code, r]) => ({ code, price: r[pi], change: r[ci], value: r[mi] as number }))
-  }, [uni, group, metric, desc])
+  }, [uni, group, metric, desc, rules])
   if (err) return <p className="p-3 text-xs text-down">Tarama verisi alınamadı.</p>
   if (!uni) return <p className="p-3 text-xs text-mute">Yükleniyor…</p>
   const kind = METRICS.find(([k]) => k === metric)?.[2] ?? 'num'
@@ -117,6 +113,7 @@ function BistScreener({ onPick }: { onPick?: () => void }) {
             <button key={l} className={`btn h-6 border border-line ${metric === m && desc === d ? 'btn-on' : ''}`} onClick={() => (setMetric(m), setDesc(d))}>{l}</button>
           ))}
         </div>
+        <ScreenerFilters rules={rules} onChange={setRules} />
       </div>
       <ul className="overflow-y-auto flex-1">
         {rows.map((r) => (
