@@ -2,7 +2,9 @@
 import { evalAlert, needsSeries } from '../src/lib/alertEval.ts'
 
 const SPARK = 'https://query1.finance.yahoo.com/v7/finance/spark'
-const BINANCE = 'https://data-api.binance.vision/api/v3'
+// Binance bazı bölgelerden gelen istekleri reddeder; sırayla denenir, çalışan adres hatırlanır.
+const BINANCE_HOSTS = ['https://data-api.binance.vision', 'https://api.binance.com', 'https://api1.binance.com', 'https://api-gcp.binance.com', 'https://api.binance.us']
+let host = 0
 const RANGE = { '5m': ['5m', '5d'], '15m': ['15m', '1mo'], '1h': ['60m', '3mo'], '1d': ['1d', '1y'] }
 const MAX_USERS = 20
 const MAX_FETCH = 40
@@ -38,17 +40,29 @@ async function spark(budget, symbols, interval, range) {
   return out
 }
 
-async function klines(budget, symbol, tf) {
-  if (budget.n-- <= 0) return undefined
-  const r = await fetch(`${BINANCE}/klines?symbol=${symbol}&interval=${tf}&limit=300`).catch(() => null)
-  if (!r?.ok) return undefined
-  return (await r.json()).map((k) => +k[4])
+async function binance(budget, path) {
+  for (let n = 0; n < BINANCE_HOSTS.length && budget.n > 0; n++, budget.n--) {
+    const i = (host + n) % BINANCE_HOSTS.length
+    const r = await fetch(`${BINANCE_HOSTS[i]}/api/v3/${path}`, { headers: HEADERS }).catch(() => null)
+    if (r?.ok) {
+      host = i
+      return r.json()
+    }
+  }
+  return undefined
 }
 
-async function dayChange(budget, symbol) {
-  if (budget.n-- <= 0) return undefined
-  const r = await fetch(`${BINANCE}/ticker/24hr?symbol=${symbol}`).catch(() => null)
-  return r?.ok ? +(await r.json()).priceChangePercent : undefined
+const klines = async (budget, symbol, tf) => (await binance(budget, `klines?symbol=${symbol}&interval=${tf}&limit=300`))?.map((k) => +k[4])
+const dayChange = async (budget, symbol) => +(await binance(budget, `ticker/24hr?symbol=${symbol}`))?.priceChangePercent
+
+/** Tanılama: Worker'dan her Binance adresinin HTTP durumu. */
+export async function diag() {
+  const out = {}
+  for (const h of BINANCE_HOSTS) {
+    const r = await fetch(`${h}/api/v3/klines?symbol=BTCUSDT&interval=1h&limit=2`, { headers: HEADERS }).catch((e) => ({ status: String(e) }))
+    out[h] = r.status
+  }
+  return out
 }
 
 async function telegram(tg, text) {
