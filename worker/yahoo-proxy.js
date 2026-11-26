@@ -1,5 +1,5 @@
 // Cloudflare Worker: Yahoo proxy (/?url=), KV belge deposu (/kv/a alarmlar, /kv/u senkron) ve zamanlanmış alarm kontrolü.
-import { runAlarms } from './alarms.js'
+import { diag, runAlarms } from './alarms.js'
 
 const ALLOWED = /^https:\/\/(query1|query2)\.finance\.yahoo\.com\//
 const CODE = /^[A-Z2-9]{20}$/
@@ -40,6 +40,7 @@ export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') return new Response(null, { headers: CORS })
     const url = new URL(request.url)
+    if (url.pathname === '/diag') return json(JSON.stringify(await diag()))
     const kv = url.pathname.match(/^\/kv\/([au])$/)
     return kv ? store(request, env, kv[1], url.searchParams.get('code')) : proxy(url.searchParams.get('url'))
   },
