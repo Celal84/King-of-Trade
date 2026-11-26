@@ -15,8 +15,8 @@ const message = (a: Alert) => `🔔 King of Trade: ${displayName(a.symbol)} · $
 function announce(a: Alert, viaTelegram: boolean) {
   const { settings, prices } = useApp.getState()
   const msg = `${message(a)} (şu an ${fmt(prices[a.symbol]?.price)})`
-  beep()
-  browserNotify('King of Trade Alarm', msg)
+  if (settings.sound !== false) beep()
+  if (settings.notify !== false) browserNotify('King of Trade Alarm', msg)
   if (viaTelegram) telegram(settings.tgToken, settings.tgChat, msg).catch(() => undefined)
 }
 

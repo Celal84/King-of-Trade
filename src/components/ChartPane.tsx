@@ -5,11 +5,12 @@ import { MarketRouter } from '../adapters/MarketRouter'
 import { useApp } from '../store/app'
 import { useReplay } from '../store/replay'
 import { heikinAshi, mergeCandle, fmt } from '../lib/candles'
-import { COMPARE_COLORS, COMPARE_SLOTS, DARK, drawingStyles, lineStyle, MAIN_PANE_INDICATORS, UP, DOWN, setupKline } from '../lib/klineSetup'
+import { COMPARE_COLORS, COMPARE_SLOTS, DARK, drawingStyles, lineStyle, MAIN_PANE_INDICATORS, setupKline } from '../lib/klineSetup'
 import { paneApis } from '../lib/chartRegistry'
 import { loadDrawings, saveDrawings, type SavedDrawing } from '../lib/drawings'
 import { displayName, getSymbol } from '../data/symbols'
 import { usePine } from '../store/pine'
+import { LINE_PALETTE } from '../lib/indicators'
 import { PINE_PREFIX, runPine, type PineResult } from '../lib/pine'
 
 const GROUP = 'drawings'
@@ -66,6 +67,7 @@ export default function ChartPane({ index }: { index: number }) {
   const hidden = useRef(new Set<string>())
   const pinePanes = useRef(new Map<string, string>())
   const redoStack = useRef<SavedDrawing[]>([])
+  const prevConfig = useRef(useApp.getState().indicatorConfig)
   const brushPath = useRef<{ x: number; y: number }[] | null>(null)
   const [brush, setBrush] = useState(false)
   const [status, setStatus] = useState<'loading' | 'ok' | 'error'>('loading')
@@ -165,7 +167,6 @@ export default function ChartPane({ index }: { index: number }) {
   useEffect(() => {
     setupKline()
     const c = init(el.current!, { styles: DARK, locale: 'tr-TR' })!
-    if (window.matchMedia('(max-width: 767px)').matches) c.setStyles({ candle: { tooltip: { showRule: TooltipShowRule.FollowCross } } })
     chart.current = c
     c.subscribeAction(ActionType.OnCrosshairChange, (d) => {
       hover.current = (d as { dataIndex?: number }).dataIndex ?? null
@@ -247,8 +248,9 @@ export default function ChartPane({ index }: { index: number }) {
       },
       indicatorInfo: (name) => {
         const pane = indis.current.get(name)
-        const ind = pane ? (c.getIndicatorByPaneId(pane, name) as { calcParams: number[]; figures: { type?: string }[] } | null) : null
-        return ind ? { params: ind.calcParams, lines: ind.figures.filter((f) => f.type === 'line').length } : null
+        const ind = pane ? (c.getIndicatorByPaneId(pane, name) as { calcParams: number[]; figures: { type?: string; title?: string }[] } | null) : null
+        const lines = ind?.figures.filter((f) => f.type === 'line') ?? []
+        return ind ? { params: ind.calcParams, lines: lines.length, titles: lines.map((f, i) => f.title?.replace(/[:\s]+$/, '') || `Çizgi ${i + 1}`) } : null
       },
       fit: (ms: number, next: Timeframe) => {
         pendingFit.current = ms
@@ -327,27 +329,39 @@ export default function ChartPane({ index }: { index: number }) {
 
   useEffect(() => {
     const { up, down } = look
+    const mobile = window.matchMedia('(max-width: 767px)').matches
+    const tick = { tickText: { size: look.fontSize, color: look.axisText } }
+    const line = (show: boolean) => ({ show, color: look.gridColor })
     chart.current?.setStyles({
-      grid: { show: look.grid },
+      grid: { show: look.gridH || look.gridV, horizontal: line(look.gridH), vertical: line(look.gridV) },
       candle: {
         bar: { upColor: up, downColor: down, upBorderColor: up, downBorderColor: down, upWickColor: up, downWickColor: down },
-        priceMark: { last: { show: look.priceLine, upColor: up, downColor: down } },
+        priceMark: { high: { show: look.highLow }, low: { show: look.highLow }, last: { show: look.priceLine, upColor: up, downColor: down } },
+        tooltip: { showRule: !look.ohlc ? TooltipShowRule.None : mobile ? TooltipShowRule.FollowCross : TooltipShowRule.Always },
       },
+      indicator: { tooltip: { showRule: look.indValues ? TooltipShowRule.Always : TooltipShowRule.None } },
+      crosshair: { show: look.crosshair },
+      xAxis: tick,
+      yAxis: tick,
     })
+    if (el.current) el.current.style.backgroundColor = look.bg
   }, [look])
 
   const configOf = (name: string) => {
     const cfg = useApp.getState().indicatorConfig[name]
+    const lines = cfg?.colors?.map((color, i) =>
+      cfg.hidden?.[i] ? lineStyle('transparent') : { ...lineStyle(color || LINE_PALETTE[i % LINE_PALETTE.length], cfg.sizes?.[i] ?? 1), style: cfg.dashed?.[i] ? 'dashed' : 'solid', dashedValue: [4, 4] })
     return {
       ...(cfg?.params?.length ? { calcParams: cfg.params } : {}),
-      ...(cfg?.colors?.length ? { styles: { lines: cfg.colors.map((color) => lineStyle(color)) } as never } : {}),
+      ...(lines?.length ? { styles: { lines } as never } : {}),
     }
   }
 
   const syncIndicators = () => {
     const c = chart.current
     if (!c) return
-    const want = useApp.getState().indicators
+    const st = useApp.getState()
+    const want = st.indicators.filter((n) => st.indicatorConfig[n]?.tfs?.includes(st.tf) ?? true)
     indis.current.forEach((pane, name) => {
       if (!want.includes(name)) {
         c.removeIndicator(pane, name)
@@ -369,8 +383,17 @@ export default function ChartPane({ index }: { index: number }) {
   }, [indicators])
 
   useEffect(() => {
+    // Ayarı sıfırlanan indikatör yeniden oluşturulur; böylece varsayılan parametre ve renklerine döner
+    const filled = (c?: object) => !!c && Object.values(c).some((v) => v !== undefined)
+    indis.current.forEach((pane, name) => {
+      if (!filled(prevConfig.current[name]) || filled(indicatorConfig[name])) return
+      chart.current?.removeIndicator(pane, name)
+      indis.current.delete(name)
+    })
+    prevConfig.current = indicatorConfig
+    syncIndicators()
     indis.current.forEach((pane, name) => chart.current?.overrideIndicator({ name, ...configOf(name) }, pane))
-  }, [indicatorConfig])
+  }, [indicatorConfig, tf])
 
   useEffect(() => {
     const c = chart.current
@@ -466,8 +489,8 @@ export default function ChartPane({ index }: { index: number }) {
     <div onClick={onClick} className={`relative flex flex-col min-h-0 min-w-0 bg-bg border ${isActive ? 'border-acc/60' : 'border-transparent'}`}>
       <div className="flex items-center gap-2 px-2 h-6 text-xs shrink-0">
         <span className="font-semibold text-txt">{displayName(symbol)}</span>
-        <span className={`w-2 h-2 rounded-full shrink-0 ${open ? 'bg-up' : 'bg-mute'}`} title={open ? 'Piyasa açık' : 'Piyasa kapalı'} />
-        <span className="text-mute truncate"><span className="hidden sm:inline">{info.name} · </span>{tf} · {shownCcy}</span>
+        {look.showStatus && <span className={`w-2 h-2 rounded-full shrink-0 ${open ? 'bg-up' : 'bg-mute'}`} title={open ? 'Piyasa açık' : 'Piyasa kapalı'} />}
+        <span className="text-mute truncate">{look.showName && <span className="hidden sm:inline">{info.name} · </span>}{tf} · {shownCcy}</span>
         {compare.filter((s) => s !== symbol).map((s, i) => (
           <button key={s} className="whitespace-nowrap hover:line-through" style={{ color: COMPARE_COLORS[i] }} title="Karşılaştırmadan çıkar"
             onClick={(e) => (e.stopPropagation(), useApp.getState().toggleCompare(s))}>● {displayName(s)}</button>
@@ -476,8 +499,8 @@ export default function ChartPane({ index }: { index: number }) {
         {delayed && <span className="text-yellow-500 whitespace-nowrap" title="Proxy tanımlı değil: veriler periyodik anlık görüntüden gelir">⏱ gecikmeli · {new Date(snapshotAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span>}
         {converted && lastClose !== undefined && <span className="ml-auto whitespace-nowrap tabular-nums">{fmt(lastClose, precisionOf(lastClose))} {shownCcy}</span>}
         {quote && !converted && (
-          <span className={`ml-auto whitespace-nowrap ${quote.change >= 0 ? 'text-up' : 'text-down'}`} style={{ color: quote.change >= 0 ? UP : DOWN }}>
-            {fmt(quote.price)} {quote.change >= 0 ? '+' : ''}{fmt(quote.price - quote.price / (1 + quote.change / 100))} ({quote.change >= 0 ? '+' : ''}{fmt(quote.change, 2)}%)
+          <span className={`ml-auto whitespace-nowrap ${quote.change >= 0 ? 'text-up' : 'text-down'}`} style={{ color: quote.change >= 0 ? look.up : look.down }}>
+            {fmt(quote.price)}{look.showChange && ` ${quote.change >= 0 ? '+' : ''}${fmt(quote.price - quote.price / (1 + quote.change / 100))} (${quote.change >= 0 ? '+' : ''}${fmt(quote.change, 2)}%)`}
           </span>
         )}
       </div>
