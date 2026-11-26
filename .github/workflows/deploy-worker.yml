@@ -3,7 +3,7 @@ name: Deploy Worker
 on:
   push:
     branches: [main]
-    paths: ['worker/**', '.github/workflows/deploy-worker.yml']
+    paths: ['worker/**', 'src/lib/alertEval.ts', '.github/workflows/deploy-worker.yml']
   workflow_dispatch:
 
 permissions:
@@ -24,6 +24,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: KV alanını hazırla
+        working-directory: worker
+        run: |
+          API="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces"
+          AUTH="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          ID=$(curl -sf -H "$AUTH" "$API?per_page=100" | jq -r '.result[] | select(.title=="king-of-trade") | .id')
+          if [ -z "$ID" ]; then
+            ID=$(curl -sf -X POST -H "$AUTH" -H 'Content-Type: application/json' -d '{"title":"king-of-trade"}' "$API" | jq -r '.result.id')
+          fi
+          test -n "$ID"
+          sed -i "s/KV_ID/$ID/" wrangler.toml
       - name: Deploy
         working-directory: worker
         run: npx --yes wrangler@4 deploy
