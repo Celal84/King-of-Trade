@@ -10,6 +10,7 @@ import { paneApis } from '../lib/chartRegistry'
 import { loadDrawings, saveDrawings, type SavedDrawing } from '../lib/drawings'
 import { displayName, getSymbol } from '../data/symbols'
 import { usePine } from '../store/pine'
+import { MOBILE } from '../hooks/useIsMobile'
 import { LINE_PALETTE } from '../lib/indicators'
 import { PINE_PREFIX, runPine, type PineResult } from '../lib/pine'
 
@@ -330,7 +331,7 @@ export default function ChartPane({ index }: { index: number }) {
 
   useEffect(() => {
     const { up, down } = look
-    const mobile = window.matchMedia('(max-width: 767px)').matches
+    const mobile = window.matchMedia(MOBILE).matches
     const tick = { tickText: { size: look.fontSize, color: look.axisText } }
     const line = (show: boolean) => ({ show, color: look.gridColor })
     chart.current?.setStyles({

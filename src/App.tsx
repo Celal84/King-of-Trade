@@ -12,7 +12,7 @@ import IndicatorSettings from './components/IndicatorSettings'
 import { useApp } from './store/app'
 import AlertsPanel from './components/AlertsPanel'
 import SettingsModal from './components/SettingsModal'
-import { useIsMobile } from './hooks/useIsMobile'
+import { useIsLandscapePhone, useIsMobile } from './hooks/useIsMobile'
 import { usePriceFeed } from './hooks/usePriceFeed'
 import { useAlertEngine } from './hooks/useAlertEngine'
 import { useCryptoUniverse } from './hooks/useCrypto'
@@ -25,6 +25,7 @@ type ModalKind = 'search' | 'compare' | 'indicators' | 'alerts' | 'settings' | n
 
 export default function App() {
   const mobile = useIsMobile()
+  const landscape = useIsLandscapePhone()
   const replay = useReplay((s) => s.active)
   const editIndicator = useApp((s) => s.editIndicator)
   const proxyDown = useApp((s) => s.proxyDown)
@@ -49,7 +50,7 @@ export default function App() {
 
   return (
     <div className="safe h-full flex flex-col bg-bg text-txt overflow-hidden">
-      <TopBar onSearch={() => setModal('search')} onIndicators={() => setModal('indicators')} onCompare={() => setModal('compare')} onAlerts={() => setModal('alerts')} onSettings={() => setModal('settings')} />
+      <TopBar onSearch={() => setModal('search')} onIndicators={() => setModal('indicators')} onCompare={() => setModal('compare')} onAlerts={() => setModal('alerts')} onSettings={() => setModal('settings')} onList={landscape ? () => setDrawer(!drawer) : undefined} />
       {proxyDown && (
         <button className="shrink-0 px-2 py-1 text-xs text-left bg-down/20 text-down" onClick={() => useApp.getState().set({ proxyDown: false })}>
           ⚠ Veri proxy’sine ulaşılamıyor; yedek kaynak kullanılıyor (veri gecikmeli olabilir). Kapatmak için dokunun.
@@ -61,13 +62,13 @@ export default function App() {
         <ChartGrid mobile={mobile} />
         {!mobile && <aside className="w-[340px] border-l border-line shrink-0"><RightPanel /></aside>}
         {mobile && drawer && (
-          <div className="absolute inset-x-0 bottom-0 h-[70%] z-40 border-t border-line rounded-t-xl overflow-hidden shadow-2xl">
+          <div className={`absolute z-40 overflow-hidden shadow-2xl border-line ${landscape ? 'inset-y-0 right-0 w-[340px] max-w-[75%] border-l' : 'inset-x-0 bottom-0 h-[70%] border-t rounded-t-xl'}`}>
             <RightPanel onPick={() => setDrawer(false)} />
           </div>
         )}
       </div>
       <BottomBar />
-      {mobile && <MobileNav drawer={drawer} setDrawer={setDrawer} onAlerts={() => setModal('alerts')} />}
+      {mobile && !landscape && <MobileNav drawer={drawer} setDrawer={setDrawer} onAlerts={() => setModal('alerts')} />}
       {modal === 'search' && <SymbolSearch onClose={close} />}
       {modal === 'compare' && <SymbolSearch onClose={close} compareMode />}
       {modal === 'indicators' && <IndicatorMenu onClose={close} />}
