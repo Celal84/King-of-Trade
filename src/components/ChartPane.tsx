@@ -263,6 +263,7 @@ export default function ChartPane({ index }: { index: number }) {
         raw.current = list
         c.setPriceVolumePrecision(precisionOf(list.at(-1)?.close), 2)
         c.applyNewData(view(list))
+        c.removeOverlay({ groupId: 'kot-bt' })
         restore()
         autoPrice()
         measure()
