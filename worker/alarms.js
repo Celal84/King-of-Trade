@@ -12,6 +12,41 @@ const CRYPTO = [
 ]
 let source = 0
 
+const RANGE = { '5m': ['5m', '5d'], '15m': ['15m', '1mo'], '1h': ['60m', '3mo'], '1d': ['1d', '1y'] }
+const MAX_USERS = 20
+const MAX_FETCH = 40
+const HEADERS = { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' }
+
+function due(a, d) {
+  const quarter = d.getUTCMinutes() % 15 < 5
+  const weekday = d.getUTCDay() % 6 !== 0
+  const h = d.getUTCHours()
+  if (a.src === 'binance') return quarter
+  if (a.src !== 'yahoo') return false
+  return a.symbol.endsWith('.IS') ? weekday && h >= 7 && (h < 15 || (h === 15 && d.getUTCMinutes() <= 20)) : weekday && quarter
+}
+
+const uniq = (list) => [...new Set(list)]
+
+async function spark(budget, symbols, interval, range) {
+  const out = {}
+  for (let i = 0; i < symbols.length && budget.n > 0; i += 20, budget.n--) {
+    const q = symbols.slice(i, i + 20).map(encodeURIComponent).join(',')
+    const r = await fetch(`${SPARK}?symbols=${q}&range=${range}&interval=${interval}`, { headers: HEADERS }).catch(() => null)
+    if (!r?.ok) continue
+    const j = await r.json()
+    for (const x of j.spark?.result ?? []) {
+      const res = x.response?.[0]
+      out[x.symbol] = {
+        closes: (res?.indicators?.quote?.[0]?.close ?? []).filter((v) => v != null),
+        price: res?.meta?.regularMarketPrice,
+        change: res?.meta?.regularMarketChangePercent,
+      }
+    }
+  }
+  return out
+}
+
 async function crypto(budget, path) {
   for (let n = 0; n < CRYPTO.length && budget.n > 0; n++, budget.n--) {
     const i = (source + n) % CRYPTO.length
