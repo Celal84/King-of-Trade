@@ -196,6 +196,40 @@ export function setupKline() {
   })
 
   registerOverlay({
+    name: 'kotEmoji',
+    totalStep: 2,
+    needDefaultPointFigure: true,
+    createPointFigures: ({ overlay, coordinates }) => ({
+      type: 'text',
+      attrs: { x: coordinates[0].x, y: coordinates[0].y, text: String(overlay.extendData ?? '🙂'), align: 'center', baseline: 'middle' },
+      styles: { color: TXT, size: 26, backgroundColor: 'transparent', borderSize: 0 },
+    }),
+  })
+
+  // Serbest çizim: yol, bağlantı noktasına göre [mum farkı, fiyat] çiftleri olarak saklanır
+  registerOverlay({
+    name: 'kotBrush',
+    totalStep: 2,
+    createPointFigures: ({ overlay, coordinates, barSpace, yAxis }) => {
+      const path = (overlay.extendData as [number, number][] | undefined) ?? []
+      if (!yAxis || !coordinates[0]) return []
+      return { type: 'line', attrs: { coordinates: path.map(([d, v]) => ({ x: coordinates[0].x + d * barSpace.bar, y: yAxis.convertToPixel(v) })) } }
+    },
+  })
+
+  registerOverlay({
+    name: 'kotXabcd',
+    totalStep: 6,
+    ...shape,
+    createPointFigures: ({ coordinates }) => [
+      ...(coordinates.length >= 3 ? [poly(coordinates.slice(0, 3))] : []),
+      ...(coordinates.length >= 5 ? [poly(coordinates.slice(2, 5))] : []),
+      { type: 'line', attrs: { coordinates } },
+      ...coordinates.map((p, n) => ({ type: 'text', ignoreEvent: true, attrs: { x: p.x, y: p.y - 6, text: 'XABCD'[n], align: 'center', baseline: 'bottom' }, styles: { color: TXT, size: 12, backgroundColor: 'transparent', borderSize: 0 } })),
+    ],
+  })
+
+  registerOverlay({
     name: 'kotMeasure',
     totalStep: 3,
     needDefaultPointFigure: true,

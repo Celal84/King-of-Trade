@@ -11,6 +11,9 @@ export type ScanOp = '<' | '>' | '<=' | '>='
 export interface ScanRule { field: string; op: ScanOp; value: number }
 export interface ScanFilter { name: string; rules: ScanRule[] }
 
+export interface ChartLook { grid: boolean; priceLine: boolean; up: string; down: string }
+export const DEFAULT_LOOK: ChartLook = { grid: true, priceLine: true, up: '#26a69a', down: '#ef5350' }
+
 interface Settings {
   proxyUrl: string
   tgToken: string
@@ -23,7 +26,7 @@ interface Settings {
 const PANES = ['THYAO.IS', 'BTCUSDT', 'GAUTRY', 'XU100.IS', 'USDTRY=X', 'ETHUSDT']
 const DEFAULT_LIST: WatchList = { name: 'Favoriler', symbols: ['THYAO.IS', 'XU100.IS', 'GAUTRY', 'USDTRY=X', 'BTCUSDT'] }
 
-type Patch = 'layout' | 'tf' | 'ccy' | 'candleKind' | 'logScale' | 'magnet' | 'drawingsVisible' | 'tab' | 'watchSymbols' | 'snapshotAt' | 'cryptoCount' | 'listIdx' | 'drawColor' | 'drawSize' | 'editIndicator' | 'proxyDown'
+type Patch = 'layout' | 'tf' | 'ccy' | 'candleKind' | 'logScale' | 'magnet' | 'drawingsVisible' | 'tab' | 'watchSymbols' | 'snapshotAt' | 'cryptoCount' | 'listIdx' | 'drawColor' | 'drawSize' | 'editIndicator' | 'proxyDown' | 'percentScale' | 'look'
 
 interface AppState {
   panes: string[]
@@ -32,6 +35,8 @@ interface AppState {
   tf: Timeframe
   candleKind: CandleKind
   logScale: boolean
+  percentScale: boolean
+  look: ChartLook
   ccy: Ccy
   indicators: string[]
   indicatorConfig: Record<string, IndicatorConfig>
@@ -85,6 +90,8 @@ export const useApp = create<AppState>()(
       tf: '1d',
       candleKind: 'candle',
       logScale: false,
+      percentScale: false,
+      look: DEFAULT_LOOK,
       ccy: 'ORG',
       indicators: ['VOL'],
       indicatorConfig: {},
