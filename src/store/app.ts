@@ -9,7 +9,7 @@ export interface WatchList { name: string; symbols: string[] }
 export const SECTION = '#'
 export const isSection = (entry: string) => entry.startsWith(SECTION)
 /** Stil dizileri (colors, sizes, dashed, hidden) çizgi sayısı kadar eleman taşır. tfs: yalnızca bu zaman dilimlerinde göster. */
-export interface IndicatorConfig { params?: number[]; colors?: string[]; sizes?: number[]; dashed?: boolean[]; hidden?: boolean[]; tfs?: Timeframe[] }
+export interface IndicatorConfig { params?: number[]; colors?: string[]; sizes?: number[]; dashed?: boolean[]; hidden?: boolean[]; tfs?: Timeframe[]; extra?: unknown }
 export interface Template { name: string; tf: Timeframe; candleKind: CandleKind; logScale: boolean; indicators: string[]; indicatorConfig: Record<string, IndicatorConfig> }
 
 export type ScanOp = '<' | '>' | '<=' | '>='
