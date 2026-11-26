@@ -16,7 +16,7 @@ interface Settings {
 const PANES = ['THYAO.IS', 'BTCUSDT', 'GAUTRY', 'XU100.IS', 'USDTRY=X', 'ETHUSDT']
 const DEFAULT_LIST: WatchList = { name: 'Favoriler', symbols: ['THYAO.IS', 'XU100.IS', 'GAUTRY', 'USDTRY=X', 'BTCUSDT'] }
 
-type Patch = 'layout' | 'tf' | 'ccy' | 'candleKind' | 'logScale' | 'magnet' | 'drawingsVisible' | 'tab' | 'watchSymbols' | 'snapshotAt' | 'cryptoCount' | 'listIdx' | 'drawColor' | 'drawSize' | 'editIndicator'
+type Patch = 'layout' | 'tf' | 'ccy' | 'candleKind' | 'logScale' | 'magnet' | 'drawingsVisible' | 'tab' | 'watchSymbols' | 'snapshotAt' | 'cryptoCount' | 'listIdx' | 'drawColor' | 'drawSize' | 'editIndicator' | 'proxyDown'
 
 interface AppState {
   panes: string[]
@@ -43,6 +43,7 @@ interface AppState {
   snapshotAt: number | null
   cryptoCount: number
   editIndicator: string | null
+  proxyDown: boolean
   notes: Record<string, string>
   setNote: (symbol: string, text: string) => void
   setSymbol: (s: string) => void
@@ -92,6 +93,7 @@ export const useApp = create<AppState>()(
       snapshotAt: null,
       cryptoCount: 0,
       editIndicator: null,
+      proxyDown: false,
       notes: {},
       setNote: (symbol, text) => set((st) => {
         const { [symbol]: _old, ...rest } = st.notes
@@ -125,7 +127,7 @@ export const useApp = create<AppState>()(
         const o = old as Partial<AppState> & { favorites?: string[] }
         return { ...o, listIdx: 0, lists: o.lists ?? [{ name: 'Favoriler', symbols: o.favorites ?? DEFAULT_LIST.symbols }], panes: [...(o.panes ?? []), ...PANES].slice(0, PANES.length) } as AppState
       },
-      partialize: ({ prices: _p, watchSymbols: _w, snapshotAt: _s, cryptoCount: _c, editIndicator: _e, ...rest }) => rest,
+      partialize: ({ prices: _p, watchSymbols: _w, snapshotAt: _s, cryptoCount: _c, editIndicator: _e, proxyDown: _d, ...rest }) => rest,
     },
   ),
 )

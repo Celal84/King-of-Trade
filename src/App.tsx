@@ -23,6 +23,7 @@ export default function App() {
   const mobile = useIsMobile()
   const replay = useReplay((s) => s.active)
   const editIndicator = useApp((s) => s.editIndicator)
+  const proxyDown = useApp((s) => s.proxyDown)
   const [modal, setModal] = useState<ModalKind>(null)
   const [drawer, setDrawer] = useState(false)
   const close = () => setModal(null)
@@ -44,6 +45,11 @@ export default function App() {
   return (
     <div className="safe h-full flex flex-col bg-bg text-txt overflow-hidden">
       <TopBar onSearch={() => setModal('search')} onIndicators={() => setModal('indicators')} onCompare={() => setModal('compare')} onAlerts={() => setModal('alerts')} onSettings={() => setModal('settings')} />
+      {proxyDown && (
+        <button className="shrink-0 px-2 py-1 text-xs text-left bg-down/20 text-down" onClick={() => useApp.getState().set({ proxyDown: false })}>
+          ⚠ Veri proxy’sine ulaşılamıyor; yedek kaynak kullanılıyor (veri gecikmeli olabilir). Kapatmak için dokunun.
+        </button>
+      )}
       {replay && <ReplayBar />}
       <div className="flex flex-1 min-h-0 relative">
         <DrawingToolbar />
