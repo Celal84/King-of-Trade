@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useApp } from '../store/app'
 import { usePaper } from '../store/paper'
+import { usePine } from '../store/pine'
 import { CODE_RE, cloudGet, cloudPut, cloudReady, syncCode } from './cloud'
 
 // Yedeklenen veriler: uygulama deposundan seçili alanlar + ham localStorage anahtarları (çizimler, sanal portföy, Pine scriptleri).
@@ -78,7 +79,7 @@ export function useCloudSync() {
     }).catch(() => {
       ready = true
     })
-    const unsub = [useApp.subscribe(schedule), usePaper.subscribe(schedule)]
+    const unsub = [useApp.subscribe(schedule), usePaper.subscribe(schedule), usePine.subscribe(schedule)]
     window.addEventListener(DIRTY_EVENT, schedule)
     return () => {
       clearTimeout(timer)

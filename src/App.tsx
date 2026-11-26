@@ -17,6 +17,8 @@ import { useAlertEngine } from './hooks/useAlertEngine'
 import { useCryptoUniverse } from './hooks/useCrypto'
 import { useReplay } from './store/replay'
 import { useCloudSync } from './lib/sync'
+import { PineSettings } from './components/PineEditor'
+import { PINE_PREFIX } from './lib/pine'
 
 type ModalKind = 'search' | 'compare' | 'indicators' | 'alerts' | 'settings' | null
 
@@ -68,7 +70,9 @@ export default function App() {
       {modal === 'search' && <SymbolSearch onClose={close} />}
       {modal === 'compare' && <SymbolSearch onClose={close} compareMode />}
       {modal === 'indicators' && <IndicatorMenu onClose={close} />}
-      {editIndicator && <IndicatorSettings name={editIndicator} onClose={() => useApp.getState().set({ editIndicator: null })} />}
+      {editIndicator && (editIndicator.startsWith(PINE_PREFIX)
+        ? <PineSettings name={editIndicator.slice(PINE_PREFIX.length)} onClose={() => useApp.getState().set({ editIndicator: null })} />
+        : <IndicatorSettings name={editIndicator} onClose={() => useApp.getState().set({ editIndicator: null })} />)}
       {modal === 'alerts' && <AlertsPanel onClose={close} />}
       {modal === 'settings' && <SettingsModal onClose={close} />}
     </div>

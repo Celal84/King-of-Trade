@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ActionType, CandleType, DomPosition, OverlayMode, TooltipShowRule, YAxisType, dispose, init, utils, type Chart, type OverlayCreate } from 'klinecharts'
+import { ActionType, CandleType, DomPosition, OverlayMode, TooltipShowRule, YAxisType, dispose, init, registerIndicator, utils, type Chart, type OverlayCreate } from 'klinecharts'
 import type { Candle, CandleKind, Timeframe } from '../types'
 import { MarketRouter } from '../adapters/MarketRouter'
 import { useApp } from '../store/app'
@@ -9,12 +9,21 @@ import { COMPARE_COLORS, COMPARE_SLOTS, DARK, drawingStyles, lineStyle, MAIN_PAN
 import { paneApis } from '../lib/chartRegistry'
 import { loadDrawings, saveDrawings } from '../lib/drawings'
 import { displayName, getSymbol } from '../data/symbols'
+import { usePine } from '../store/pine'
+import { PINE_PREFIX, runPine, type PineResult } from '../lib/pine'
 
 const GROUP = 'drawings'
 const TEXT_TOOLS = ['kotText', 'simpleAnnotation', 'simpleTag']
 const view = (l: Candle[]) => (useApp.getState().candleKind === 'heikin' ? heikinAshi(l) : l)
 const precisionOf = (p = 1) => (p < 1 ? 6 : p < 10 ? 4 : 2)
 const DEFAULT_BAR = 8
+type PineRows = Map<number, Record<string, number>>
+
+function pineRows(r: PineResult): PineRows {
+  const rows: PineRows = new Map()
+  r.plots.forEach((p, i) => p.values.forEach((v, t) => rows.set(t, { ...rows.get(t), [`p${i}`]: v })))
+  return rows
+}
 
 interface YAxisInternal {
   getRange: () => { from: number; to: number; range: number }
@@ -46,6 +55,7 @@ export default function ChartPane({ index }: { index: number }) {
   const symRef = useRef('')
   const pendingFit = useRef<number | null>(null)
   const hidden = useRef(new Set<string>())
+  const pinePanes = useRef(new Map<string, string>())
   const [status, setStatus] = useState<'loading' | 'ok' | 'error'>('loading')
   const [lastClose, setLastClose] = useState<number>()
   const [axis, setAxis] = useState({ width: 0, height: 0 })
@@ -64,6 +74,8 @@ export default function ChartPane({ index }: { index: number }) {
   const quote = useApp((s) => s.prices[symbol])
   const snapshotAt = useApp((s) => s.snapshotAt)
   const note = useApp((s) => s.notes[symbol])
+  const pineScripts = usePine((s) => s.scripts)
+  const pineDraft = usePine((s) => s.draft)
   const shownCcy = MarketRouter.currencyOf(symbol, ccy)
   const converted = shownCcy !== getSymbol(symbol).currency
   symRef.current = converted ? `${symbol}:${shownCcy}` : symbol
@@ -149,6 +161,11 @@ export default function ChartPane({ index }: { index: number }) {
       const st = useApp.getState()
       const slot = COMPARE_SLOTS.indexOf(name)
       if (iconId === 'settings') return slot < 0 && st.set({ editIndicator: name })
+      if (iconId === 'close' && name.startsWith(PINE_PREFIX)) {
+        const pine = usePine.getState()
+        const script = name.slice(PINE_PREFIX.length)
+        return pine.draft?.name === script ? pine.setDraft(null) : pine.toggle(script)
+      }
       if (iconId === 'visible') {
         hidden.current[hidden.current.has(name) ? 'delete' : 'add'](name)
         return c.overrideIndicator({ name, visible: !hidden.current.has(name) }, paneId)
@@ -331,6 +348,38 @@ export default function ChartPane({ index }: { index: number }) {
       alive = false
     }
   }, [compare, symbol, tf, ccy, status])
+
+  useEffect(() => {
+    const c = chart.current
+    if (!c || status !== 'ok') return
+    let alive = true
+    const panes = pinePanes.current
+    const shown = [...pineScripts.filter((s) => s.on && s.name !== pineDraft?.name), ...(pineDraft ? [pineDraft] : [])]
+    const draw = () => shown.forEach((s) => {
+      runPine(s.code, raw.current, s.inputs, tf).then((r) => {
+        if (!alive || !r.plots.length) return
+        const name = PINE_PREFIX + s.name
+        const pane = panes.get(name)
+        if (pane) return c.overrideIndicator({ name, extendData: pineRows(r) }, pane)
+        registerIndicator({
+          name, shortName: s.name, precision: 2,
+          figures: r.plots.map((p, i) => ({ key: `p${i}`, title: `${p.title}: `, type: p.kind, ...(p.kind === 'bar' ? { baseValue: 0, styles: () => ({ color: p.color }) } : {}) })),
+          calc: (list, ind) => list.map((k) => (ind.extendData as PineRows).get(k.timestamp) ?? {}),
+        })
+        const lines = r.plots.filter((p) => p.kind === 'line').map((p) => lineStyle(p.color, p.width))
+        const created = c.createIndicator({ name, extendData: pineRows(r), styles: { lines } as never }, r.overlay, r.overlay ? { id: 'candle_pane' } : { height: 100 })
+        if (created) panes.set(name, created)
+      }).catch(() => undefined)
+    })
+    draw()
+    const id = setInterval(draw, 60_000)
+    return () => {
+      alive = false
+      clearInterval(id)
+      panes.forEach((pane, name) => c.removeIndicator(pane, name))
+      panes.clear()
+    }
+  }, [pineScripts, pineDraft, symbol, tf, ccy, status])
 
   useEffect(() => {
     chart.current?.overrideOverlay({ groupId: GROUP, visible, mode: magnet ? OverlayMode.WeakMagnet : OverlayMode.Normal })

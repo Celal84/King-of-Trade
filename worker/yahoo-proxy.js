@@ -4,6 +4,8 @@ import { runAlarms } from './alarms.js'
 const ALLOWED = /^https:\/\/(query1|query2)\.finance\.yahoo\.com\//
 const CODE = /^[A-Z2-9]{20}$/
 const MAX_BODY = 1_000_000
+// Alarm belgeleri uygulama her açıldığında yenilenir; 60 gün hiç açılmayan cihazın alarmları silinir.
+const ALARM_TTL = 60 * 86400
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
@@ -18,7 +20,7 @@ async function store(request, env, kind, code) {
   if (request.method !== 'PUT') return json('{"error":"yöntem"}', 405)
   const body = await request.text()
   if (body.length > MAX_BODY) return json('{"error":"boyut"}', 413)
-  await env.KV.put(key, body)
+  await env.KV.put(key, body, kind === 'a' ? { expirationTtl: ALARM_TTL } : undefined)
   return json('{"ok":true}')
 }
 
