@@ -45,6 +45,7 @@ export default function ChartPane({ index }: { index: number }) {
   const restoring = useRef(false)
   const symRef = useRef('')
   const pendingFit = useRef<number | null>(null)
+  const hidden = useRef(new Set<string>())
   const [status, setStatus] = useState<'loading' | 'ok' | 'error'>('loading')
   const [lastClose, setLastClose] = useState<number>()
   const [axis, setAxis] = useState({ width: 0, height: 0 })
@@ -62,6 +63,7 @@ export default function ChartPane({ index }: { index: number }) {
   const isActive = useApp((s) => s.active === index)
   const quote = useApp((s) => s.prices[symbol])
   const snapshotAt = useApp((s) => s.snapshotAt)
+  const note = useApp((s) => s.notes[symbol])
   const shownCcy = MarketRouter.currencyOf(symbol, ccy)
   const converted = shownCcy !== getSymbol(symbol).currency
   symRef.current = converted ? `${symbol}:${shownCcy}` : symbol
@@ -141,6 +143,20 @@ export default function ChartPane({ index }: { index: number }) {
     chart.current = c
     c.subscribeAction(ActionType.OnCrosshairChange, (d) => {
       hover.current = (d as { dataIndex?: number }).dataIndex ?? null
+    })
+    c.subscribeAction(ActionType.OnTooltipIconClick, (d) => {
+      const { indicatorName: name, iconId, paneId } = d as { indicatorName: string; iconId: string; paneId: string }
+      const st = useApp.getState()
+      const slot = COMPARE_SLOTS.indexOf(name)
+      if (iconId === 'settings') return slot < 0 && st.set({ editIndicator: name })
+      if (iconId === 'visible') {
+        hidden.current[hidden.current.has(name) ? 'delete' : 'add'](name)
+        return c.overrideIndicator({ name, visible: !hidden.current.has(name) }, paneId)
+      }
+      if (slot >= 0) {
+        const s = st.compare.filter((x) => x !== symRef.current.split(':')[0])[slot]
+        if (s) st.toggleCompare(s)
+      } else st.toggleIndicator(name)
     })
     const ro = new ResizeObserver(() => (c.resize(), measure()))
     ro.observe(el.current!)
@@ -326,6 +342,7 @@ export default function ChartPane({ index }: { index: number }) {
           <button key={s} className="whitespace-nowrap hover:line-through" style={{ color: COMPARE_COLORS[i] }} title="Karşılaştırmadan çıkar"
             onClick={(e) => (e.stopPropagation(), useApp.getState().toggleCompare(s))}>● {displayName(s)}</button>
         ))}
+        {note && <span className="truncate text-yellow-300 max-w-[30%]" title={note}>📝 {note}</span>}
         {delayed && <span className="text-yellow-500 whitespace-nowrap" title="Proxy tanımlı değil: veriler periyodik anlık görüntüden gelir">⏱ gecikmeli · {new Date(snapshotAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span>}
         {converted && lastClose !== undefined && <span className="ml-auto whitespace-nowrap tabular-nums">{fmt(lastClose, precisionOf(lastClose))} {shownCcy}</span>}
         {quote && !converted && (
