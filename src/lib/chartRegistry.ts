@@ -22,7 +22,7 @@ export interface PaneApi {
   candles: () => Candle[]
   /** Strateji testi al/sat işaretlerini çizer; boş liste işaretleri temizler. */
   markers: (list: Marker[]) => void
-  indicatorInfo: (name: string) => { params: number[]; lines: number } | null
+  indicatorInfo: (name: string) => { params: number[]; lines: number; titles: string[] } | null
 }
 
 export const paneApis = new Map<number, PaneApi>()

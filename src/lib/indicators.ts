@@ -53,6 +53,19 @@ export const PARAM_HINTS: Record<string, string> = {
   VPVR: 'Satır sayısı, mum sayısı (0 = ekranda görünen aralık; ör. 24, 200 = son 200 mum)',
   SUPERTREND: 'ATR periyodu, çarpan', ICHIMOKU: 'Tenkan, Kijun, Senkou B', KELTNER: 'Periyot, ATR çarpanı', STOCHRSI: 'RSI, Stokastik, %K, %D',
 }
+const LEN = ['Uzunluk']
+/** Girdiler sekmesindeki parametre adları; listede olmayanlar "Parametre n" olarak gösterilir. */
+export const PARAM_LABELS: Record<string, string[]> = {
+  MACD: ['Hızlı Uzunluk', 'Yavaş Uzunluk', 'Sinyal Uzunluğu'], BOLL: ['Uzunluk', 'Std Sapma'], KDJ: ['Periyot', '%K Yumuşatma', '%D Yumuşatma'],
+  SAR: ['Başlangıç', 'Artış', 'Maksimum'], SUPERTREND: ['ATR Periyodu', 'Çarpan'], ICHIMOKU: ['Tenkan', 'Kijun', 'Senkou B'], KELTNER: ['Periyot', 'ATR Çarpanı'],
+  STOCHRSI: ['RSI Uzunluğu', 'Stokastik Uzunluğu', '%K', '%D'], PIVOT: ['Dönem'], VPVR: ['Satır Sayısı', 'Mum Sayısı'],
+  ATR: LEN, CMF: LEN, MFI: LEN, CCI: LEN, DONCHIAN: LEN, HMA: LEN, WR: LEN, ROC: ['Uzunluk', 'MA Uzunluğu'],
+}
+/** Parametre sayısı değiştirilebilen (çoklu periyot) indikatörler ve parametre adı öneki. */
+export const MULTI_PARAM: Record<string, string> = { MA: 'Periyot', EMA: 'Periyot', SMA: 'Periyot', RSI: 'RSI Uzunluğu', VOL: 'Hacim MA', BIAS: 'Periyot' }
+export const paramLabel = (name: string, i: number) => (MULTI_PARAM[name] ? `${MULTI_PARAM[name]} ${i + 1}` : (PARAM_LABELS[name]?.[i] ?? `Parametre ${i + 1}`))
+export const LINE_PALETTE = ['#ff9600', '#935ebd', '#2196f3', '#e11d74', '#01c5c4']
+
 const PIVOT_KEYS = [undefined, 60_000, 3_600_000, DAY, 7 * DAY]
 
 export const INDICATOR_LABELS: Record<string, string> = {

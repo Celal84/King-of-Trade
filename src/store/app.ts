@@ -4,15 +4,26 @@ import type { CandleKind, Ccy, Layout, Quote, Timeframe } from '../types'
 
 export type PanelTab = 'watch' | 'scan' | 'fund' | 'paper' | 'test'
 export interface WatchList { name: string; symbols: string[] }
-export interface IndicatorConfig { params?: number[]; colors?: string[] }
+/** Stil dizileri (colors, sizes, dashed, hidden) çizgi sayısı kadar eleman taşır. tfs: yalnızca bu zaman dilimlerinde göster. */
+export interface IndicatorConfig { params?: number[]; colors?: string[]; sizes?: number[]; dashed?: boolean[]; hidden?: boolean[]; tfs?: Timeframe[] }
 export interface Template { name: string; tf: Timeframe; candleKind: CandleKind; logScale: boolean; indicators: string[]; indicatorConfig: Record<string, IndicatorConfig> }
 
 export type ScanOp = '<' | '>' | '<=' | '>='
 export interface ScanRule { field: string; op: ScanOp; value: number }
 export interface ScanFilter { name: string; rules: ScanRule[] }
 
-export interface ChartLook { grid: boolean; priceLine: boolean; up: string; down: string }
-export const DEFAULT_LOOK: ChartLook = { grid: true, priceLine: true, up: '#26a69a', down: '#ef5350' }
+export interface ChartLook {
+  up: string; down: string; priceLine: boolean; highLow: boolean
+  showName: boolean; showStatus: boolean; showChange: boolean; ohlc: boolean; indValues: boolean
+  gridH: boolean; gridV: boolean; crosshair: boolean; fontSize: number
+  bg: string; gridColor: string; axisText: string
+}
+export const DEFAULT_LOOK: ChartLook = {
+  up: '#26a69a', down: '#ef5350', priceLine: true, highLow: true,
+  showName: true, showStatus: true, showChange: true, ohlc: true, indValues: true,
+  gridH: true, gridV: true, crosshair: true, fontSize: 12,
+  bg: '#131722', gridColor: '#1f2430', axisText: '#787b86',
+}
 
 interface Settings {
   proxyUrl: string
@@ -21,6 +32,9 @@ interface Settings {
   syncCode?: string
   syncOn?: boolean
   syncAt?: number
+  /** Alarm tetiklenince sesli uyarı / tarayıcı bildirimi (varsayılan: açık). */
+  sound?: boolean
+  notify?: boolean
 }
 
 const PANES = ['THYAO.IS', 'BTCUSDT', 'GAUTRY', 'XU100.IS', 'USDTRY=X', 'ETHUSDT']
@@ -142,10 +156,11 @@ export const useApp = create<AppState>()(
     }),
     {
       name: 'kot:app',
-      version: 1,
+      version: 2,
       migrate: (old) => {
-        const o = old as Partial<AppState> & { favorites?: string[] }
-        return { ...o, listIdx: 0, lists: o.lists ?? [{ name: 'Favoriler', symbols: o.favorites ?? DEFAULT_LIST.symbols }], panes: [...(o.panes ?? []), ...PANES].slice(0, PANES.length) } as AppState
+        const o = old as Partial<AppState> & { favorites?: string[]; look?: Partial<ChartLook> & { grid?: boolean } }
+        const grid = o.look?.grid ?? true
+        return { ...o, look: { ...DEFAULT_LOOK, gridH: grid, gridV: grid, ...o.look }, listIdx: o.listIdx ?? 0, lists: o.lists ?? [{ name: 'Favoriler', symbols: o.favorites ?? DEFAULT_LIST.symbols }], panes: [...(o.panes ?? []), ...PANES].slice(0, PANES.length) } as AppState
       },
       partialize: ({ prices: _p, watchSymbols: _w, snapshotAt: _s, cryptoCount: _c, editIndicator: _e, proxyDown: _d, ...rest }) => rest,
     },
