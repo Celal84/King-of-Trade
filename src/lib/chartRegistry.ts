@@ -1,4 +1,6 @@
-import type { Timeframe } from '../types'
+import type { Candle, Timeframe } from '../types'
+
+export interface Marker { timestamp: number; price: number; buy: boolean }
 
 export interface PaneApi {
   draw: (name: string) => void
@@ -13,6 +15,10 @@ export interface PaneApi {
   undo: () => void
   screenshot: () => void
   /** Etkin indikatörün geçerli parametreleri ve çizgi sayısı. */
+  /** Grafikte yüklü ham mum verisi. */
+  candles: () => Candle[]
+  /** Strateji testi al/sat işaretlerini çizer; boş liste işaretleri temizler. */
+  markers: (list: Marker[]) => void
   indicatorInfo: (name: string) => { params: number[]; lines: number } | null
 }
 

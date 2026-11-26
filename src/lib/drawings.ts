@@ -18,4 +18,5 @@ export function loadDrawings(symbol: string): SavedDrawing[] {
 export function saveDrawings(symbol: string, list: SavedDrawing[]) {
   if (list.length) localStorage.setItem(key(symbol), JSON.stringify(list))
   else localStorage.removeItem(key(symbol))
+  window.dispatchEvent(new Event('kot:dirty'))
 }

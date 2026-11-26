@@ -6,6 +6,8 @@ import { useApp } from '../store/app'
 import { COMPARE_SLOTS, MAIN_PANE_INDICATORS } from '../lib/klineSetup'
 import { paneApis } from '../lib/chartRegistry'
 import { INDICATOR_LABELS, PARAM_HINTS } from '../lib/indicators'
+import { usePine } from '../store/pine'
+import PineEditor from './PineEditor'
 
 const POPULAR = ['MA', 'EMA', 'BOLL', 'VWAP', 'SUPERTREND', 'ICHIMOKU', 'PIVOT', 'VPVR', 'VOL', 'MACD', 'RSI', 'STOCHRSI', 'CMF', 'MFI', 'ATR', 'SAR', 'DONCHIAN', 'KELTNER', 'HMA', 'KDJ', 'CCI', 'OBV']
 const PALETTE = ['#ff9600', '#935ebd', '#2196f3', '#e11d74', '#01c5c4']
@@ -54,6 +56,9 @@ export function IndicatorSettings({ name, onClose }: { name: string; onClose: ()
 export default function IndicatorMenu({ onClose }: { onClose: () => void }) {
   const { indicators, toggleIndicator, templates, saveTemplate, applyTemplate, removeTemplate } = useApp()
   const [editing, setEditing] = useState<string | null>(null)
+  const [tab, setTab] = useState<'list' | 'pine'>('list')
+  const [pineName, setPineName] = useState<string>()
+  const pine = usePine()
   const rest = getSupportedIndicators().filter((n) => !POPULAR.includes(n) && !COMPARE_SLOTS.includes(n)).sort()
   const row = (n: string) => (
     <button key={n} className={`btn justify-between w-full ${indicators.includes(n) ? 'btn-on' : ''}`} onClick={() => toggleIndicator(n)}>
@@ -63,6 +68,11 @@ export default function IndicatorMenu({ onClose }: { onClose: () => void }) {
   )
   return (
     <Modal title="İndikatörler" onClose={onClose}>
+      <div className="flex border-b border-line mb-2 text-xs">
+        <button className={`tab flex-1 ${tab === 'list' ? 'tab-on' : ''}`} onClick={() => setTab('list')}>İndikatörler</button>
+        <button className={`tab flex-1 ${tab === 'pine' ? 'tab-on' : ''}`} onClick={() => setTab('pine')}>Pine Script</button>
+      </div>
+      {tab === 'pine' ? <PineEditor key={pineName} initial={pineName} /> : (
       <div className="text-xs">
         <div className="flex gap-1 mb-3">
           <select className="inp h-8 text-xs" value="" onChange={(e) => e.target.value && applyTemplate(+e.target.value)}>
@@ -83,11 +93,22 @@ export default function IndicatorMenu({ onClose }: { onClose: () => void }) {
             {editing === n && <Editor name={n} />}
           </div>
         ))}
+        <p className="text-mute mt-3 mb-1">Benim İndikatörlerim (Pine Script)</p>
+        {pine.scripts.map((sc) => (
+          <div key={sc.name} className="flex items-center gap-1 mb-1">
+            <button className={`btn justify-between flex-1 ${sc.on ? 'btn-on' : ''}`} onClick={() => pine.toggle(sc.name)}>
+              <span className="truncate text-left">{sc.name}</span>
+              {sc.on && <Check size={14} />}
+            </button>
+            <button className="btn" onClick={() => (setPineName(sc.name), setTab('pine'))}><Settings2 size={14} /> Düzenle</button>
+          </div>
+        ))}
         <p className="text-mute mt-3 mb-1">Popüler</p>
         <div className="grid grid-cols-2 gap-1">{POPULAR.map(row)}</div>
         <p className="text-mute mt-3 mb-1">Diğer</p>
         <div className="grid grid-cols-2 gap-1">{rest.map(row)}</div>
       </div>
+      )}
     </Modal>
   )
 }

@@ -2,16 +2,22 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { CandleKind, Ccy, Layout, Quote, Timeframe } from '../types'
 
-export type PanelTab = 'watch' | 'scan' | 'fund' | 'paper'
+export type PanelTab = 'watch' | 'scan' | 'fund' | 'paper' | 'test'
 export interface WatchList { name: string; symbols: string[] }
 export interface IndicatorConfig { params?: number[]; colors?: string[] }
 export interface Template { name: string; tf: Timeframe; candleKind: CandleKind; logScale: boolean; indicators: string[]; indicatorConfig: Record<string, IndicatorConfig> }
+
+export type ScanOp = '<' | '>' | '<=' | '>='
+export interface ScanRule { field: string; op: ScanOp; value: number }
+export interface ScanFilter { name: string; rules: ScanRule[] }
 
 interface Settings {
   proxyUrl: string
   tgToken: string
   tgChat: string
   syncCode?: string
+  syncOn?: boolean
+  syncAt?: number
 }
 
 const PANES = ['THYAO.IS', 'BTCUSDT', 'GAUTRY', 'XU100.IS', 'USDTRY=X', 'ETHUSDT']
@@ -35,6 +41,7 @@ interface AppState {
   drawColor: string
   drawSize: number
   templates: Template[]
+  scans: ScanFilter[]
   lists: WatchList[]
   listIdx: number
   settings: Settings
@@ -56,6 +63,8 @@ interface AppState {
   saveTemplate: (name: string) => void
   applyTemplate: (i: number) => void
   removeTemplate: (i: number) => void
+  saveScan: (f: ScanFilter) => void
+  removeScan: (name: string) => void
   toggleFavorite: (s: string) => void
   addList: (name: string) => void
   renameList: (name: string) => void
@@ -85,6 +94,7 @@ export const useApp = create<AppState>()(
       drawColor: '#2962ff',
       drawSize: 1,
       templates: [],
+      scans: [],
       lists: [DEFAULT_LIST],
       listIdx: 0,
       settings: { proxyUrl: '', tgToken: '', tgChat: '' },
@@ -114,6 +124,8 @@ export const useApp = create<AppState>()(
         return t ? { tf: t.tf, candleKind: t.candleKind, logScale: t.logScale, indicators: t.indicators, indicatorConfig: { ...st.indicatorConfig, ...t.indicatorConfig } } : {}
       }),
       removeTemplate: (i) => set((st) => ({ templates: st.templates.filter((_, j) => j !== i) })),
+      saveScan: (f) => set((st) => ({ scans: [...st.scans.filter((x) => x.name !== f.name), f] })),
+      removeScan: (name) => set((st) => ({ scans: st.scans.filter((x) => x.name !== name) })),
       toggleFavorite: (s) => set((st) => editList(st, (l) => ({ ...l, symbols: toggle(l.symbols, s) }))),
       addList: (name) => set((st) => ({ lists: [...st.lists, { name, symbols: [] }], listIdx: st.lists.length })),
       renameList: (name) => set((st) => editList(st, (l) => ({ ...l, name }))),

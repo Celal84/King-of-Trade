@@ -101,6 +101,6 @@ export async function runAlarms(env, now) {
       fired = true
       await telegram(u.doc.tg, `${a.label} (şu an ${ctx.price ?? '—'})`)
     }
-    if (fired) await env.KV.put(u.key, JSON.stringify(u.doc))
+    if (fired) await env.KV.put(u.key, JSON.stringify(u.doc), { expirationTtl: 60 * 86400 })
   }
 }

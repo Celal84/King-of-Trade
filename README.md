@@ -15,7 +15,12 @@ BIST 100, Emtia, Sentetik TR pariteleri ve canlı Kripto destekli, açık kaynak
 - **Ek indikatörler:** Hacim Profili (görünen aralık), Pivot Noktaları Standart, Chaikin Money Flow, VWAP, SuperTrend, Ichimoku, Stokastik RSI, MFI, Donchian, Keltner, Hull MA; grafik şablonları.
 - **Grafik üzeri indikatör düğmeleri:** her indikatör satırında ayar (⚙), gizle/göster (◐) ve kaldır (✕); Ichimoku bulut dolgusu, pivot dönemi seçimi, sabit aralıklı hacim profili; Fibonacci uzatması, Gann yelpazesi, dalga çizimi; sembol notları.
 - **Fiyat cetveli:** sağdaki cetveli parmakla/fareyle sürükleyerek ölçekleme, çift dokunuşla otomatik.
-- **Bar Replay**, **Alarmlar** (fiyat, RSI, günlük % değişim, EMA üstü/altı; ses + bildirim + Telegram), `Ctrl+K` sembol arama.
+- **Bar Replay**, `Ctrl+K` sembol arama, başlıkta **Güncelle** butonu (yeni sürüm kontrolü, önbellek temizleme).
+- **Sunucu taraflı alarmlar:** fiyat, RSI, günlük % değişim, EMA üstü/altı, EMA/SMA kesişimi, yatay çizgiye dokunma; VE/VEYA ile çoklu koşul. Alarmlar Cloudflare Worker'da saklanır, uygulama kapalıyken de Telegram'a gönderilir.
+- **Çok koşullu tarama:** alan + operatör + değer satırları (ör. F/K < 10, RSI < 30), isimle kaydedilen filtreler.
+- **Bulut senkronu:** listeler, çizimler, şablonlar, tarama filtreleri, Pine scriptleri ve sanal portföy "senkron kodu" ile yedeklenir ve başka cihazda geri yüklenir.
+- **Strateji testi:** indikatör kurallarıyla al/sat, komisyon, toplam getiri, kazanma oranı, maksimum düşüş; işlemler grafikte işaretlenir.
+- **Pine Script editörü:** PineTS ile tarayıcıda çalışır; `plot()` çıktıları grafiğe çizilir, `input()` değerleri ayarlardan değiştirilir, scriptler "Benim İndikatörlerim" altında saklanır.
 
 ## Geliştirme
 ```bash
@@ -24,17 +29,20 @@ npm run dev
 npm run build
 ```
 
-## Yahoo verisi nasıl gelir?
+## Veri ve Cloudflare Worker
 Tarayıcıda Yahoo Finance CORS engeli vardır. Uygulama sırayla şu kaynakları kullanır:
 1. **Android APK:** istekler native HTTP ile doğrudan gider.
-2. **Özel proxy (canlıya en yakın):** `worker/yahoo-proxy.js` dosyasını ücretsiz bir Cloudflare Worker olarak yayınlayıp URL'yi **Ayarlar → Yahoo Proxy URL** alanına girin.
-3. **Anlık görüntü (ayarsız çalışır):** `deploy-web.yml` yaklaşık 15 dakikada bir `scripts/snapshot.mjs` ile BIST hisse listesini, endeks üyeliklerini, fiyat, mum ve temel verileri çekip siteyle birlikte `data/` altında yayınlar. Proxy yoksa uygulama bu veriyi kullanır ve grafikte "⏱ gecikmeli" etiketi gösterir.
+2. **Kendi Worker'ı (varsayılan):** `worker/` klasörü `deploy-worker.yml` ile Cloudflare'e deploy edilir; adresi derleme sırasında otomatik bulunur. Aynı Worker alarmları (KV + 5 dakikalık tek cron) ve bulut senkronunu da sunar.
+3. **Yedekler:** Worker yanıt vermezse genel CORS proxy'leri ve yaklaşık 15 dakikada bir üretilen anlık görüntü (`data/`) kullanılır; ekranda uyarı ve "⏱ gecikmeli" etiketi görünür.
+
+Gerekli repo secret'ları: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` ("Edit Cloudflare Workers" şablonu). Ücretsiz plan sınırlarına göre tasarlanmıştır: alarmlar toplu istekle kontrol edilir, KV'ye yalnızca alarm tetiklenince veya kullanıcı değişiklik yapınca yazılır.
 
 Yahoo'nun BIST verisi kaynağında da yaklaşık 15 dakika gecikmelidir. Kripto verisi Binance'ten canlı gelir.
 
 ## Dağıtım
 - **Web:** `main` dalına push → `.github/workflows/deploy-web.yml` → GitHub Pages. (Repo Ayarları → Pages → Source: *GitHub Actions*.)
-- **APK:** `main` push veya manuel tetikleme → `.github/workflows/build-apk.yml` → `KingOfTrade-debug.apk` artifact.
+- **APK:** `main` push veya manuel tetikleme → `.github/workflows/build-apk.yml` → `KingOfTrade_vX.Y.Z.apk` (GitHub release).
+- **Worker:** `worker/` değişince → `.github/workflows/deploy-worker.yml` → Cloudflare Workers.
 
 ## Lisans
-MIT
+Bu repodaki kod MIT lisanslıdır. Pine Script editörü [PineTS](https://github.com/LuxAlgo/PineTS) (AGPL-3.0) kütüphanesini kullanır; bu yüzden derlenmiş uygulamanın dağıtımı AGPL-3.0 koşullarına tabidir (kaynak kodu bu repoda açıktır).
