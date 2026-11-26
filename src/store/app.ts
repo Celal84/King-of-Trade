@@ -1,9 +1,13 @@
+import { useMemo } from 'react'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { CandleKind, Ccy, Layout, Quote, Timeframe } from '../types'
 
 export type PanelTab = 'watch' | 'scan' | 'fund' | 'paper' | 'test'
+/** symbols: sembol kodları ve `#Bölüm adı` biçiminde bölüm başlıkları, görüntülenme sırasıyla. */
 export interface WatchList { name: string; symbols: string[] }
+export const SECTION = '#'
+export const isSection = (entry: string) => entry.startsWith(SECTION)
 /** Stil dizileri (colors, sizes, dashed, hidden) çizgi sayısı kadar eleman taşır. tfs: yalnızca bu zaman dilimlerinde göster. */
 export interface IndicatorConfig { params?: number[]; colors?: string[]; sizes?: number[]; dashed?: boolean[]; hidden?: boolean[]; tfs?: Timeframe[] }
 export interface Template { name: string; tf: Timeframe; candleKind: CandleKind; logScale: boolean; indicators: string[]; indicatorConfig: Record<string, IndicatorConfig> }
@@ -85,6 +89,10 @@ interface AppState {
   saveScan: (f: ScanFilter) => void
   removeScan: (name: string) => void
   toggleFavorite: (s: string) => void
+  addSection: (name: string) => void
+  renameSection: (from: string, to: string) => void
+  removeEntry: (index: number) => void
+  moveEntry: (from: number, to: number) => void
   addList: (name: string) => void
   renameList: (name: string) => void
   removeList: () => void
@@ -148,6 +156,15 @@ export const useApp = create<AppState>()(
       saveScan: (f) => set((st) => ({ scans: [...st.scans.filter((x) => x.name !== f.name), f] })),
       removeScan: (name) => set((st) => ({ scans: st.scans.filter((x) => x.name !== name) })),
       toggleFavorite: (s) => set((st) => editList(st, (l) => ({ ...l, symbols: toggle(l.symbols, s) }))),
+      addSection: (name) => set((st) => editList(st, (l) => (l.symbols.includes(SECTION + name) ? l : { ...l, symbols: [...l.symbols, SECTION + name] }))),
+      renameSection: (from, to) => set((st) => editList(st, (l) => ({ ...l, symbols: l.symbols.map((x) => (x === SECTION + from ? SECTION + to : x)) }))),
+      removeEntry: (index) => set((st) => editList(st, (l) => ({ ...l, symbols: l.symbols.filter((_, i) => i !== index) }))),
+      moveEntry: (from, to) => set((st) => editList(st, (l) => {
+        const next = [...l.symbols]
+        const [item] = next.splice(from, 1)
+        next.splice(to, 0, item)
+        return { ...l, symbols: next }
+      })),
       addList: (name) => set((st) => ({ lists: [...st.lists, { name, symbols: [] }], listIdx: st.lists.length })),
       renameList: (name) => set((st) => editList(st, (l) => ({ ...l, name }))),
       removeList: () => set((st) => (st.lists.length > 1 ? { lists: st.lists.filter((_, i) => i !== st.listIdx), listIdx: 0 } : {})),
@@ -167,4 +184,10 @@ export const useApp = create<AppState>()(
   ),
 )
 
-export const useFavorites = () => useApp((s) => s.lists[s.listIdx]?.symbols ?? s.lists[0].symbols)
+/** Etkin listenin bölüm başlıkları dahil tüm girdileri. */
+export const useListEntries = () => useApp((s) => s.lists[s.listIdx]?.symbols ?? s.lists[0].symbols)
+/** Etkin listedeki semboller (bölüm başlıkları hariç). */
+export const useFavorites = () => {
+  const entries = useListEntries()
+  return useMemo(() => entries.filter((e) => !isSection(e)), [entries])
+}
