@@ -2,65 +2,44 @@
 import { evalAlert, needsSeries } from '../src/lib/alertEval.ts'
 
 const SPARK = 'https://query1.finance.yahoo.com/v7/finance/spark'
-// Binance bazı bölgelerden gelen istekleri reddeder; sırayla denenir, çalışan adres hatırlanır.
-const BINANCE_HOSTS = ['https://data-api.binance.vision', 'https://api.binance.com', 'https://api1.binance.com', 'https://api-gcp.binance.com', 'https://api.binance.us']
-let host = 0
-const RANGE = { '5m': ['5m', '5d'], '15m': ['15m', '1mo'], '1h': ['60m', '3mo'], '1d': ['1d', '1y'] }
-const MAX_USERS = 20
-const MAX_FETCH = 40
-const HEADERS = { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' }
+// Binance, Cloudflare'in bazı bölgelerinden gelen istekleri reddeder (403/451). Sırayla denenir, çalışan kaynak hatırlanır.
+// MEXC aynı API biçimini ve aynı USDT paritelerini sunar; yalnızca saatlik aralık adı ve değişim birimi farklıdır.
+const CRYPTO = [
+  { base: 'https://data-api.binance.vision/api/v3', tf: (t) => t, pct: 1 },
+  { base: 'https://api.binance.com/api/v3', tf: (t) => t, pct: 1 },
+  { base: 'https://api.mexc.com/api/v3', tf: (t) => (t === '1h' ? '60m' : t), pct: 100 },
+  { base: 'https://api.binance.us/api/v3', tf: (t) => t, pct: 1 },
+]
+let source = 0
 
-function due(a, d) {
-  const quarter = d.getUTCMinutes() % 15 < 5
-  const weekday = d.getUTCDay() % 6 !== 0
-  const h = d.getUTCHours()
-  if (a.src === 'binance') return quarter
-  if (a.src !== 'yahoo') return false
-  return a.symbol.endsWith('.IS') ? weekday && h >= 7 && (h < 15 || (h === 15 && d.getUTCMinutes() <= 20)) : weekday && quarter
-}
-
-const uniq = (list) => [...new Set(list)]
-
-async function spark(budget, symbols, interval, range) {
-  const out = {}
-  for (let i = 0; i < symbols.length && budget.n > 0; i += 20, budget.n--) {
-    const q = symbols.slice(i, i + 20).map(encodeURIComponent).join(',')
-    const r = await fetch(`${SPARK}?symbols=${q}&range=${range}&interval=${interval}`, { headers: HEADERS }).catch(() => null)
-    if (!r?.ok) continue
-    const j = await r.json()
-    for (const x of j.spark?.result ?? []) {
-      const res = x.response?.[0]
-      out[x.symbol] = {
-        closes: (res?.indicators?.quote?.[0]?.close ?? []).filter((v) => v != null),
-        price: res?.meta?.regularMarketPrice,
-        change: res?.meta?.regularMarketChangePercent,
-      }
-    }
-  }
-  return out
-}
-
-async function binance(budget, path) {
-  for (let n = 0; n < BINANCE_HOSTS.length && budget.n > 0; n++, budget.n--) {
-    const i = (host + n) % BINANCE_HOSTS.length
-    const r = await fetch(`${BINANCE_HOSTS[i]}/api/v3/${path}`, { headers: HEADERS }).catch(() => null)
+async function crypto(budget, path) {
+  for (let n = 0; n < CRYPTO.length && budget.n > 0; n++, budget.n--) {
+    const i = (source + n) % CRYPTO.length
+    const r = await fetch(`${CRYPTO[i].base}/${path(CRYPTO[i])}`, { headers: HEADERS }).catch(() => null)
     if (r?.ok) {
-      host = i
-      return r.json()
+      source = i
+      return [await r.json(), CRYPTO[i]]
     }
   }
-  return undefined
+  return []
 }
 
-const klines = async (budget, symbol, tf) => (await binance(budget, `klines?symbol=${symbol}&interval=${tf}&limit=300`))?.map((k) => +k[4])
-const dayChange = async (budget, symbol) => +(await binance(budget, `ticker/24hr?symbol=${symbol}`))?.priceChangePercent
+async function klines(budget, symbol, tf) {
+  const [rows] = await crypto(budget, (c) => `klines?symbol=${symbol}&interval=${c.tf(tf)}&limit=300`)
+  return Array.isArray(rows) ? rows.map((k) => +k[4]) : undefined
+}
 
-/** Tanılama: Worker'dan her Binance adresinin HTTP durumu. */
+async function dayChange(budget, symbol) {
+  const [t, c] = await crypto(budget, () => `ticker/24hr?symbol=${symbol}`)
+  return t ? +t.priceChangePercent * c.pct : undefined
+}
+
+/** Tanılama: Worker'dan her kripto kaynağının HTTP durumu. */
 export async function diag() {
   const out = {}
-  for (const h of BINANCE_HOSTS) {
-    const r = await fetch(`${h}/api/v3/klines?symbol=BTCUSDT&interval=1h&limit=2`, { headers: HEADERS }).catch((e) => ({ status: String(e) }))
-    out[h] = r.status
+  for (const c of CRYPTO) {
+    const r = await fetch(`${c.base}/klines?symbol=BTCUSDT&interval=${c.tf('1h')}&limit=2`, { headers: HEADERS }).catch((e) => ({ status: String(e) }))
+    out[c.base] = r.status
   }
   return out
 }
@@ -95,12 +74,12 @@ export async function runAlarms(env, now) {
     const data = await spark(budget, symbols, ...RANGE[tf])
     for (const s of symbols) series[`${s}|${tf}`] = data[s]?.closes
   }
-  const crypto = {}
+  const changes = {}
   for (const a of all.filter((x) => x.src === 'binance')) {
     const id = `${a.symbol}|${a.tf}`
     if (!(id in series)) series[id] = await klines(budget, a.symbol, a.tf)
     const needChange = a.conds.some((c) => c.kind.startsWith('change'))
-    if (needChange && !(a.symbol in crypto)) crypto[a.symbol] = await dayChange(budget, a.symbol)
+    if (needChange && !(a.symbol in changes)) changes[a.symbol] = await dayChange(budget, a.symbol)
   }
 
   for (const u of users) {
@@ -108,7 +87,7 @@ export async function runAlarms(env, now) {
     for (const a of u.list) {
       const closes = series[`${a.symbol}|${a.tf}`] ?? []
       const q = quotes[a.symbol]
-      const ctx = a.src === 'binance' ? { closes, price: closes[closes.length - 1], change: crypto[a.symbol] } : { closes, price: q?.price, change: q?.change }
+      const ctx = a.src === 'binance' ? { closes, price: closes[closes.length - 1], change: changes[a.symbol] } : { closes, price: q?.price, change: q?.change }
       if (!evalAlert(a, ctx)) continue
       a.active = false
       a.triggeredAt = Date.now()
