@@ -1,5 +1,6 @@
 import { registerIndicator, registerLocale, registerOverlay, type Coordinate, type DeepPartial, type OverlayTemplate, type Styles } from 'klinecharts'
 import type { Candle } from '../types'
+import { CUSTOM_MAIN, registerCustomIndicators } from './indicators'
 
 export const UP = '#26a69a'
 export const DOWN = '#ef5350'
@@ -7,7 +8,7 @@ const LINE = '#2a2e39'
 const MUTE = '#787b86'
 const TXT = '#d1d4dc'
 
-export const MAIN_PANE_INDICATORS = ['MA', 'EMA', 'SMA', 'BOLL', 'SAR', 'BBI', 'AVP']
+export const MAIN_PANE_INDICATORS = ['MA', 'EMA', 'SMA', 'BOLL', 'SAR', 'BBI', 'AVP', ...CUSTOM_MAIN]
 
 const axis = { axisLine: { color: LINE }, tickLine: { color: LINE }, tickText: { color: MUTE } }
 const cross = { line: { color: '#758696' }, text: { backgroundColor: '#363a45', borderColor: '#363a45' } }
@@ -29,10 +30,13 @@ export const DARK: DeepPartial<Styles> = {
 export const lineStyle = (color: string, size = 1) => ({ style: 'solid', smooth: false, size, dashedValue: [2, 2], color })
 export const COMPARE_SLOTS = ['CMP1', 'CMP2', 'CMP3', 'CMP4']
 export const COMPARE_COLORS = ['#f0b90b', '#e040fb', '#00bcd4', '#ff7043']
-const FILL = 'rgba(41,98,255,0.15)'
-const ACC = '#2962ff'
+/** Yeni çizimlere uygulanan stil (renk ve kalınlık). */
+export const drawingStyles = (color: string, size: number) => {
+  const area = { style: 'stroke_fill', color: `${color}26`, borderColor: color, borderSize: size }
+  return { line: { color, size }, polygon: area, circle: area, rect: area }
+}
 const shape = { needDefaultPointFigure: true, needDefaultXAxisFigure: true, needDefaultYAxisFigure: true }
-const poly = (coordinates: Coordinate[]) => ({ type: 'polygon', attrs: { coordinates }, styles: { style: 'stroke_fill', color: FILL, borderColor: ACC, borderSize: 1 } })
+const poly = (coordinates: Coordinate[]) => ({ type: 'polygon', attrs: { coordinates } })
 const label = (x: number, y: number, text: string, bg: string, baseline = 'bottom') => ({
   type: 'text', ignoreEvent: true, attrs: { x, y, text, align: 'left', baseline },
   styles: { color: '#fff', size: 11, backgroundColor: bg, borderSize: 0, paddingLeft: 4, paddingRight: 4, paddingTop: 2, paddingBottom: 2 },
@@ -50,7 +54,7 @@ const SHAPES: OverlayTemplate[] = [
   {
     name: 'kotCircle', totalStep: 3, ...shape,
     createPointFigures: ({ coordinates: [a, b] }) =>
-      b ? { type: 'circle', attrs: { x: a.x, y: a.y, r: Math.hypot(b.x - a.x, b.y - a.y) }, styles: { style: 'stroke_fill', color: FILL, borderColor: ACC, borderSize: 1 } } : [],
+      b ? { type: 'circle', attrs: { x: a.x, y: a.y, r: Math.hypot(b.x - a.x, b.y - a.y) } } : [],
   },
   {
     name: 'kotArrow', totalStep: 3, ...shape,
@@ -59,8 +63,8 @@ const SHAPES: OverlayTemplate[] = [
       const ang = Math.atan2(b.y - a.y, b.x - a.x)
       const head = [0.4, -0.4].map((d) => ({ x: b.x - 12 * Math.cos(ang + d), y: b.y - 12 * Math.sin(ang + d) }))
       return [
-        { type: 'line', attrs: { coordinates: [a, b] }, styles: { color: ACC, size: 2 } },
-        { type: 'polygon', ignoreEvent: true, attrs: { coordinates: [b, ...head] }, styles: { style: 'fill', color: ACC } },
+        { type: 'line', attrs: { coordinates: [a, b] } },
+        { type: 'polygon', ignoreEvent: true, attrs: { coordinates: [b, ...head] } },
       ]
     },
   },
@@ -114,6 +118,7 @@ export function setupKline() {
   })
 
   SHAPES.forEach(registerOverlay)
+  registerCustomIndicators()
 
   COMPARE_SLOTS.forEach((name, i) =>
     registerIndicator<{ v?: number }>({

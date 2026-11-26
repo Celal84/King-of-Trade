@@ -2,6 +2,7 @@ export interface SavedDrawing {
   name: string
   points: { timestamp: number; value: number }[]
   extendData?: unknown
+  styles?: unknown
 }
 
 const key = (s: string) => `kot:draw:${s}`

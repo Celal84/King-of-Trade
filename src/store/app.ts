@@ -5,6 +5,7 @@ import type { CandleKind, Ccy, Layout, Quote, Timeframe } from '../types'
 export type PanelTab = 'watch' | 'scan' | 'fund' | 'paper'
 export interface WatchList { name: string; symbols: string[] }
 export interface IndicatorConfig { params?: number[]; colors?: string[] }
+export interface Template { name: string; tf: Timeframe; candleKind: CandleKind; logScale: boolean; indicators: string[]; indicatorConfig: Record<string, IndicatorConfig> }
 
 interface Settings {
   proxyUrl: string
@@ -15,7 +16,7 @@ interface Settings {
 const PANES = ['THYAO.IS', 'BTCUSDT', 'GAUTRY', 'XU100.IS', 'USDTRY=X', 'ETHUSDT']
 const DEFAULT_LIST: WatchList = { name: 'Favoriler', symbols: ['THYAO.IS', 'XU100.IS', 'GAUTRY', 'USDTRY=X', 'BTCUSDT'] }
 
-type Patch = 'layout' | 'tf' | 'ccy' | 'candleKind' | 'logScale' | 'magnet' | 'drawingsVisible' | 'tab' | 'watchSymbols' | 'snapshotAt' | 'cryptoCount' | 'listIdx'
+type Patch = 'layout' | 'tf' | 'ccy' | 'candleKind' | 'logScale' | 'magnet' | 'drawingsVisible' | 'tab' | 'watchSymbols' | 'snapshotAt' | 'cryptoCount' | 'listIdx' | 'drawColor' | 'drawSize'
 
 interface AppState {
   panes: string[]
@@ -30,6 +31,9 @@ interface AppState {
   compare: string[]
   magnet: boolean
   drawingsVisible: boolean
+  drawColor: string
+  drawSize: number
+  templates: Template[]
   lists: WatchList[]
   listIdx: number
   settings: Settings
@@ -44,6 +48,9 @@ interface AppState {
   toggleIndicator: (n: string) => void
   setIndicatorConfig: (n: string, c: IndicatorConfig) => void
   toggleCompare: (s: string) => void
+  saveTemplate: (name: string) => void
+  applyTemplate: (i: number) => void
+  removeTemplate: (i: number) => void
   toggleFavorite: (s: string) => void
   addList: (name: string) => void
   renameList: (name: string) => void
@@ -70,6 +77,9 @@ export const useApp = create<AppState>()(
       compare: [],
       magnet: false,
       drawingsVisible: true,
+      drawColor: '#2962ff',
+      drawSize: 1,
+      templates: [],
       lists: [DEFAULT_LIST],
       listIdx: 0,
       settings: { proxyUrl: '', tgToken: '', tgChat: '' },
@@ -84,6 +94,14 @@ export const useApp = create<AppState>()(
       toggleIndicator: (n) => set((st) => ({ indicators: toggle(st.indicators, n) })),
       setIndicatorConfig: (n, c) => set((st) => ({ indicatorConfig: { ...st.indicatorConfig, [n]: c } })),
       toggleCompare: (s) => set((st) => ({ compare: toggle(st.compare, s).slice(-4) })),
+      saveTemplate: (name) => set((st) => ({
+        templates: [...st.templates.filter((t) => t.name !== name), { name, tf: st.tf, candleKind: st.candleKind, logScale: st.logScale, indicators: st.indicators, indicatorConfig: st.indicatorConfig }],
+      })),
+      applyTemplate: (i) => set((st) => {
+        const t = st.templates[i]
+        return t ? { tf: t.tf, candleKind: t.candleKind, logScale: t.logScale, indicators: t.indicators, indicatorConfig: { ...st.indicatorConfig, ...t.indicatorConfig } } : {}
+      }),
+      removeTemplate: (i) => set((st) => ({ templates: st.templates.filter((_, j) => j !== i) })),
       toggleFavorite: (s) => set((st) => editList(st, (l) => ({ ...l, symbols: toggle(l.symbols, s) }))),
       addList: (name) => set((st) => ({ lists: [...st.lists, { name, symbols: [] }], listIdx: st.lists.length })),
       renameList: (name) => set((st) => editList(st, (l) => ({ ...l, name }))),

@@ -5,7 +5,7 @@ import { MarketRouter } from '../adapters/MarketRouter'
 import { useApp } from '../store/app'
 import { useReplay } from '../store/replay'
 import { heikinAshi, mergeCandle, fmt } from '../lib/candles'
-import { COMPARE_COLORS, COMPARE_SLOTS, DARK, lineStyle, MAIN_PANE_INDICATORS, UP, DOWN, setupKline } from '../lib/klineSetup'
+import { COMPARE_COLORS, COMPARE_SLOTS, DARK, drawingStyles, lineStyle, MAIN_PANE_INDICATORS, UP, DOWN, setupKline } from '../lib/klineSetup'
 import { paneApis } from '../lib/chartRegistry'
 import { loadDrawings, saveDrawings } from '../lib/drawings'
 import { displayName, getSymbol } from '../data/symbols'
@@ -47,6 +47,8 @@ export default function ChartPane({ index }: { index: number }) {
   const pendingFit = useRef<number | null>(null)
   const [status, setStatus] = useState<'loading' | 'ok' | 'error'>('loading')
   const [lastClose, setLastClose] = useState<number>()
+  const [axis, setAxis] = useState({ width: 0, height: 0 })
+  const dragY = useRef<number | null>(null)
   const symbol = useApp((s) => s.panes[index])
   const tf = useApp((s) => s.tf)
   const ccy = useApp((s) => s.ccy)
@@ -69,15 +71,16 @@ export default function ChartPane({ index }: { index: number }) {
     if (!c || restoring.current) return
     const list = [...ids.current].flatMap((id) => {
       const o = c.getOverlayById(id)
-      return o ? [{ name: o.name, points: o.points.map((p) => ({ timestamp: p.timestamp ?? 0, value: p.value ?? 0 })), extendData: o.extendData }] : []
+      return o ? [{ name: o.name, points: o.points.map((p) => ({ timestamp: p.timestamp ?? 0, value: p.value ?? 0 })), extendData: o.extendData, styles: o.styles }] : []
     })
     saveDrawings(symRef.current, list)
   }
 
   const create = (o: Partial<OverlayCreate> & { name: string }) => {
-    const { magnet: m, drawingsVisible: v } = useApp.getState()
+    const { magnet: m, drawingsVisible: v, drawColor, drawSize } = useApp.getState()
     const id = chart.current?.createOverlay({
       ...o,
+      styles: o.styles ?? (drawingStyles(drawColor, drawSize) as never),
       groupId: GROUP,
       mode: m ? OverlayMode.WeakMagnet : OverlayMode.Normal,
       visible: v,
@@ -103,6 +106,10 @@ export default function ChartPane({ index }: { index: number }) {
     yAxis()?.setAutoCalcTickFlag(true)
     internal()?.adjustPaneViewport(false, true, true, true)
   }
+  const measure = () => {
+    const s = chart.current?.getSize('candle_pane', DomPosition.YAxis)
+    if (s) setAxis((a) => (a.width === s.width && a.height === s.height ? a : { width: s.width, height: s.height }))
+  }
   const applyFit = () => {
     const c = chart.current
     const ms = pendingFit.current
@@ -123,7 +130,7 @@ export default function ChartPane({ index }: { index: number }) {
     restoring.current = true
     ids.current.clear()
     c.removeOverlay({ groupId: GROUP })
-    loadDrawings(symRef.current).forEach((d) => create(d))
+    loadDrawings(symRef.current).forEach((d) => create(d as Partial<OverlayCreate> & { name: string }))
     restoring.current = false
   }
 
@@ -135,7 +142,7 @@ export default function ChartPane({ index }: { index: number }) {
     c.subscribeAction(ActionType.OnCrosshairChange, (d) => {
       hover.current = (d as { dataIndex?: number }).dataIndex ?? null
     })
-    const ro = new ResizeObserver(() => c.resize())
+    const ro = new ResizeObserver(() => (c.resize(), measure()))
     ro.observe(el.current!)
     paneApis.set(index, {
       draw: (name) => {
@@ -214,6 +221,7 @@ export default function ChartPane({ index }: { index: number }) {
         c.applyNewData(view(list))
         restore()
         autoPrice()
+        measure()
         applyFit()
         setStatus(list.length ? 'ok' : 'error')
         const last = list.at(-1)
@@ -272,7 +280,11 @@ export default function ChartPane({ index }: { index: number }) {
     })
   }
 
-  useEffect(syncIndicators, [indicators])
+  useEffect(() => {
+    syncIndicators()
+    const id = setTimeout(measure, 100)
+    return () => clearTimeout(id)
+  }, [indicators])
 
   useEffect(() => {
     indis.current.forEach((pane, name) => chart.current?.overrideIndicator({ name, ...configOf(name) }, pane))
@@ -322,7 +334,22 @@ export default function ChartPane({ index }: { index: number }) {
           </span>
         )}
       </div>
-      <div ref={el} className="flex-1 min-h-0" style={{ touchAction: 'none' }} />
+      <div className="relative flex-1 min-h-0">
+        <div ref={el} className="absolute inset-0" style={{ touchAction: 'none' }} />
+        <div
+          className="absolute right-0 top-0 z-10 cursor-ns-resize" style={{ ...axis, touchAction: 'none' }} title="Sürükle: fiyat ölçeği · çift dokun: otomatik"
+          onPointerDown={(e) => (e.currentTarget.setPointerCapture(e.pointerId), (dragY.current = e.clientY))}
+          onPointerMove={(e) => {
+            if (dragY.current === null) return
+            scalePrice(Math.exp((e.clientY - dragY.current) * 0.006))
+            dragY.current = e.clientY
+          }}
+          onPointerUp={() => (dragY.current = null)}
+          onPointerCancel={() => (dragY.current = null)}
+          onWheel={(e) => scalePrice(Math.exp(e.deltaY * 0.001))}
+          onDoubleClick={autoPrice}
+        />
+      </div>
       {status !== 'ok' && (
         <div className="absolute inset-0 top-6 flex items-center justify-center text-mute text-sm pointer-events-none">
           {status === 'loading' ? 'Yükleniyor…' : 'Veri alınamadı. Ayarlar’dan Proxy URL girmeyi deneyin.'}

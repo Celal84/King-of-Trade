@@ -2,9 +2,10 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Timeframe } from '../types'
 
-export type AlertKind = 'price_above' | 'price_below' | 'rsi_below' | 'rsi_above'
+export type AlertKind = 'price_above' | 'price_below' | 'rsi_below' | 'rsi_above' | 'change_above' | 'change_below' | 'ema_above' | 'ema_below'
 export const ALERT_LABEL: Record<AlertKind, string> = {
   price_above: 'Fiyat >', price_below: 'Fiyat <', rsi_below: 'RSI(14) <', rsi_above: 'RSI(14) >',
+  change_above: 'Günlük değişim % >', change_below: 'Günlük değişim % <', ema_above: 'Fiyat, EMA(n) üstünde; n =', ema_below: 'Fiyat, EMA(n) altında; n =',
 }
 
 export interface Alert {

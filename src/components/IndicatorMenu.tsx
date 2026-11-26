@@ -5,8 +5,9 @@ import Modal from './Modal'
 import { useApp } from '../store/app'
 import { COMPARE_SLOTS, MAIN_PANE_INDICATORS } from '../lib/klineSetup'
 import { paneApis } from '../lib/chartRegistry'
+import { INDICATOR_LABELS } from '../lib/indicators'
 
-const POPULAR = ['MA', 'EMA', 'BOLL', 'SAR', 'VOL', 'MACD', 'RSI', 'KDJ', 'ATR', 'CCI', 'OBV']
+const POPULAR = ['MA', 'EMA', 'BOLL', 'VWAP', 'SUPERTREND', 'ICHIMOKU', 'PIVOT', 'VPVR', 'VOL', 'MACD', 'RSI', 'STOCHRSI', 'CMF', 'MFI', 'ATR', 'SAR', 'DONCHIAN', 'KELTNER', 'HMA', 'KDJ', 'CCI', 'OBV']
 const PALETTE = ['#ff9600', '#935ebd', '#2196f3', '#e11d74', '#01c5c4']
 
 function Editor({ name }: { name: string }) {
@@ -39,23 +40,31 @@ function Editor({ name }: { name: string }) {
 }
 
 export default function IndicatorMenu({ onClose }: { onClose: () => void }) {
-  const { indicators, toggleIndicator } = useApp()
+  const { indicators, toggleIndicator, templates, saveTemplate, applyTemplate, removeTemplate } = useApp()
   const [editing, setEditing] = useState<string | null>(null)
   const rest = getSupportedIndicators().filter((n) => !POPULAR.includes(n) && !COMPARE_SLOTS.includes(n)).sort()
   const row = (n: string) => (
     <button key={n} className={`btn justify-between w-full ${indicators.includes(n) ? 'btn-on' : ''}`} onClick={() => toggleIndicator(n)}>
-      <span>{n} <span className="text-mute">{MAIN_PANE_INDICATORS.includes(n) ? '· ana grafik' : ''}</span></span>
+      <span className="truncate text-left">{INDICATOR_LABELS[n] ?? n} <span className="text-mute">{MAIN_PANE_INDICATORS.includes(n) ? '· ana grafik' : ''}</span></span>
       {indicators.includes(n) && <Check size={14} />}
     </button>
   )
   return (
     <Modal title="İndikatörler" onClose={onClose}>
       <div className="text-xs">
+        <div className="flex gap-1 mb-3">
+          <select className="inp h-8 text-xs" value="" onChange={(e) => e.target.value && applyTemplate(+e.target.value)}>
+            <option value="">Şablon uygula… ({templates.length})</option>
+            {templates.map((t, i) => <option key={t.name} value={i}>{t.name} · {t.tf} · {t.indicators.join(', ')}</option>)}
+          </select>
+          <button className="btn border border-line" onClick={() => { const n = window.prompt('Şablon adı (zaman dilimi, mum tipi ve indikatörler kaydedilir):')?.trim(); if (n) saveTemplate(n) }}>Kaydet</button>
+          {templates.length > 0 && <button className="btn border border-line text-down" onClick={() => { const n = window.prompt(`Silinecek şablon adı:\n${templates.map((t) => t.name).join(', ')}`)?.trim(); const i = templates.findIndex((t) => t.name === n); if (i >= 0) removeTemplate(i) }}>Sil</button>}
+        </div>
         {indicators.length > 0 && <p className="text-mute mb-1">Etkin — ayar için dişliye dokunun</p>}
         {indicators.map((n) => (
           <div key={n}>
             <div className="flex items-center gap-1 mb-1">
-              <span className="flex-1 font-semibold">{n}</span>
+              <span className="flex-1 font-semibold">{INDICATOR_LABELS[n] ?? n}</span>
               <button className={`btn ${editing === n ? 'btn-on' : ''}`} onClick={() => setEditing(editing === n ? null : n)}><Settings2 size={14} /> Ayarlar</button>
               <button className="btn text-down" aria-label="Kaldır" onClick={() => toggleIndicator(n)}><X size={14} /></button>
             </div>
