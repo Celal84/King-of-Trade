@@ -7,7 +7,7 @@ import { useReplay } from '../store/replay'
 import { heikinAshi, mergeCandle, fmt } from '../lib/candles'
 import { COMPARE_COLORS, COMPARE_SLOTS, DARK, drawingStyles, lineStyle, MAIN_PANE_INDICATORS, UP, DOWN, setupKline } from '../lib/klineSetup'
 import { paneApis } from '../lib/chartRegistry'
-import { loadDrawings, saveDrawings } from '../lib/drawings'
+import { loadDrawings, saveDrawings, type SavedDrawing } from '../lib/drawings'
 import { displayName, getSymbol } from '../data/symbols'
 import { usePine } from '../store/pine'
 import { PINE_PREFIX, runPine, type PineResult } from '../lib/pine'
@@ -17,6 +17,15 @@ const TEXT_TOOLS = ['kotText', 'simpleAnnotation', 'simpleTag']
 const view = (l: Candle[]) => (useApp.getState().candleKind === 'heikin' ? heikinAshi(l) : l)
 const precisionOf = (p = 1) => (p < 1 ? 6 : p < 10 ? 4 : 2)
 const DEFAULT_BAR = 8
+
+/** Piyasa şu an açık mı (BIST: hafta içi 10:00–18:10 TSİ; kripto: her zaman; diğerleri: hafta içi). */
+function marketOpen(symbol: string): boolean {
+  if (getSymbol(symbol).source === 'binance') return true
+  const tr = new Date(Date.now() + 3 * 3600_000)
+  const weekday = tr.getUTCDay() % 6 !== 0
+  const minutes = tr.getUTCHours() * 60 + tr.getUTCMinutes()
+  return symbol.endsWith('.IS') ? weekday && minutes >= 600 && minutes <= 1090 : weekday
+}
 type PineRows = Map<number, Record<string, number>>
 
 function pineRows(r: PineResult): PineRows {
@@ -56,6 +65,9 @@ export default function ChartPane({ index }: { index: number }) {
   const pendingFit = useRef<number | null>(null)
   const hidden = useRef(new Set<string>())
   const pinePanes = useRef(new Map<string, string>())
+  const redoStack = useRef<SavedDrawing[]>([])
+  const brushPath = useRef<{ x: number; y: number }[] | null>(null)
+  const [brush, setBrush] = useState(false)
   const [status, setStatus] = useState<'loading' | 'ok' | 'error'>('loading')
   const [lastClose, setLastClose] = useState<number>()
   const [axis, setAxis] = useState({ width: 0, height: 0 })
@@ -65,6 +77,8 @@ export default function ChartPane({ index }: { index: number }) {
   const ccy = useApp((s) => s.ccy)
   const kind = useApp((s) => s.candleKind)
   const log = useApp((s) => s.logScale)
+  const percent = useApp((s) => s.percentScale)
+  const look = useApp((s) => s.look)
   const indicators = useApp((s) => s.indicators)
   const indicatorConfig = useApp((s) => s.indicatorConfig)
   const compare = useApp((s) => s.compare)
@@ -178,8 +192,10 @@ export default function ChartPane({ index }: { index: number }) {
     const ro = new ResizeObserver(() => (c.resize(), measure()))
     ro.observe(el.current!)
     paneApis.set(index, {
-      draw: (name) => {
-        if (TEXT_TOOLS.includes(name)) {
+      draw: (name, data) => {
+        if (name === 'kotBrush') setBrush(true)
+        else if (data) create({ name, extendData: data })
+        else if (TEXT_TOOLS.includes(name)) {
           const text = window.prompt('Metin:')
           if (text) create({ name, extendData: text })
         } else create({ name })
@@ -200,8 +216,18 @@ export default function ChartPane({ index }: { index: number }) {
       },
       undo: () => {
         const last = [...ids.current].at(-1)
-        if (last) c.removeOverlay(last)
+        const o = last ? c.getOverlayById(last) : null
+        if (!last || !o) return
+        redoStack.current.push({ name: o.name, points: o.points.map((p) => ({ timestamp: p.timestamp ?? 0, value: p.value ?? 0 })), extendData: o.extendData, styles: o.styles })
+        c.removeOverlay(last)
       },
+      redo: () => {
+        const d = redoStack.current.pop()
+        if (!d) return
+        create(d as Partial<OverlayCreate> & { name: string })
+        save()
+      },
+      goTo: (timestamp) => c.scrollToTimestamp(timestamp, 200),
       screenshot: () => {
         const a = document.createElement('a')
         a.href = c.getConvertPictureUrl(true, 'png', '#131722')
@@ -296,8 +322,19 @@ export default function ChartPane({ index }: { index: number }) {
   }, [kind])
 
   useEffect(() => {
-    chart.current?.setStyles({ yAxis: { type: compare.length ? YAxisType.Percentage : log ? YAxisType.Log : YAxisType.Normal } })
-  }, [log, compare.length])
+    chart.current?.setStyles({ yAxis: { type: compare.length || percent ? YAxisType.Percentage : log ? YAxisType.Log : YAxisType.Normal } })
+  }, [log, percent, compare.length])
+
+  useEffect(() => {
+    const { up, down } = look
+    chart.current?.setStyles({
+      grid: { show: look.grid },
+      candle: {
+        bar: { upColor: up, downColor: down, upBorderColor: up, downBorderColor: down, upWickColor: up, downWickColor: down },
+        priceMark: { last: { show: look.priceLine, upColor: up, downColor: down } },
+      },
+    })
+  }, [look])
 
   const configOf = (name: string) => {
     const cfg = useApp.getState().indicatorConfig[name]
@@ -392,12 +429,44 @@ export default function ChartPane({ index }: { index: number }) {
     if (r.active && r.selecting && r.pane === index && hover.current !== null) r.set({ cursor: hover.current, selecting: false })
   }
 
+  const brushEnd = () => {
+    const c = chart.current
+    const path = brushPath.current
+    brushPath.current = null
+    setBrush(false)
+    if (!c || !path || path.length < 2) return
+    const pts = c.convertFromPixel(path, { paneId: 'candle_pane' }) as { timestamp?: number; value?: number }[]
+    const first = pts[0]
+    if (first?.timestamp === undefined || first.value === undefined) return
+    const bar = c.getBarSpace()
+    create({ name: 'kotBrush', points: [{ timestamp: first.timestamp, value: first.value }], extendData: path.map((p, i) => [(p.x - path[0].x) / bar, pts[i].value ?? first.value]) })
+    save()
+  }
+  const brushMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const path = brushPath.current
+    if (!path) return
+    const r = e.currentTarget.getBoundingClientRect()
+    const p = { x: e.clientX - r.left, y: e.clientY - r.top }
+    const g = e.currentTarget.getContext('2d')
+    const last = path[path.length - 1]
+    if (g && last) {
+      g.strokeStyle = useApp.getState().drawColor
+      g.lineWidth = useApp.getState().drawSize
+      g.beginPath()
+      g.moveTo(last.x, last.y)
+      g.lineTo(p.x, p.y)
+      g.stroke()
+    }
+    path.push(p)
+  }
+  const open = marketOpen(symbol)
   const info = getSymbol(symbol)
   const delayed = snapshotAt !== null && info.source !== 'binance'
   return (
     <div onClick={onClick} className={`relative flex flex-col min-h-0 min-w-0 bg-bg border ${isActive ? 'border-acc/60' : 'border-transparent'}`}>
       <div className="flex items-center gap-2 px-2 h-6 text-xs shrink-0">
         <span className="font-semibold text-txt">{displayName(symbol)}</span>
+        <span className={`w-2 h-2 rounded-full shrink-0 ${open ? 'bg-up' : 'bg-mute'}`} title={open ? 'Piyasa açık' : 'Piyasa kapalı'} />
         <span className="text-mute truncate"><span className="hidden sm:inline">{info.name} · </span>{tf} · {shownCcy}</span>
         {compare.filter((s) => s !== symbol).map((s, i) => (
           <button key={s} className="whitespace-nowrap hover:line-through" style={{ color: COMPARE_COLORS[i] }} title="Karşılaştırmadan çıkar"
@@ -408,12 +477,24 @@ export default function ChartPane({ index }: { index: number }) {
         {converted && lastClose !== undefined && <span className="ml-auto whitespace-nowrap tabular-nums">{fmt(lastClose, precisionOf(lastClose))} {shownCcy}</span>}
         {quote && !converted && (
           <span className={`ml-auto whitespace-nowrap ${quote.change >= 0 ? 'text-up' : 'text-down'}`} style={{ color: quote.change >= 0 ? UP : DOWN }}>
-            {fmt(quote.price)} ({quote.change >= 0 ? '+' : ''}{fmt(quote.change, 2)}%)
+            {fmt(quote.price)} {quote.change >= 0 ? '+' : ''}{fmt(quote.price - quote.price / (1 + quote.change / 100))} ({quote.change >= 0 ? '+' : ''}{fmt(quote.change, 2)}%)
           </span>
         )}
       </div>
       <div className="relative flex-1 min-h-0">
         <div ref={el} className="absolute inset-0" style={{ touchAction: 'none' }} />
+        {brush && (
+          <canvas
+            className="absolute inset-0 z-20 w-full h-full cursor-crosshair" style={{ touchAction: 'none' }}
+            ref={(cv) => cv && cv.width !== cv.clientWidth && ((cv.width = cv.clientWidth), (cv.height = cv.clientHeight))}
+            onPointerDown={(e) => {
+              e.currentTarget.setPointerCapture(e.pointerId)
+              const r = e.currentTarget.getBoundingClientRect()
+              brushPath.current = [{ x: e.clientX - r.left, y: e.clientY - r.top }]
+            }}
+            onPointerMove={brushMove} onPointerUp={brushEnd} onPointerCancel={brushEnd}
+          />
+        )}
         <div
           className="absolute right-0 top-0 z-10 cursor-ns-resize" style={{ ...axis, touchAction: 'none' }} title="Sürükle: fiyat ölçeği · çift dokun: otomatik"
           onPointerDown={(e) => (e.currentTarget.setPointerCapture(e.pointerId), (dragY.current = e.clientY))}

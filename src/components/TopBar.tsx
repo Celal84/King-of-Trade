@@ -7,7 +7,7 @@ import UpdateButton from './UpdateButton'
 import { TIMEFRAMES, type CandleKind, type Ccy, type Layout } from '../types'
 
 const KINDS: [CandleKind, string][] = [['candle', 'Mum'], ['hollow', 'Hollow'], ['heikin', 'Heikin Ashi'], ['line', 'Çizgi'], ['area', 'Alan']]
-const CCYS: [Ccy, string][] = [['ORG', 'Orijinal'], ['TRY', 'TL'], ['USD', 'USD'], ['EUR', 'EUR']]
+const CCYS: [Ccy, string, string][] = [['TRY', '₺', 'TL bazında göster'], ['USD', '$', 'USD bazında göster'], ['EUR', '€', 'EUR bazında göster']]
 const LAYOUTS: [Layout, typeof Square][] = [['1x1', Square], ['1x2', Columns2], ['1x3', Columns3], ['2x2', LayoutGrid], ['2x3', Grid3x3]]
 
 interface Props {
@@ -19,7 +19,13 @@ interface Props {
 }
 
 export default function TopBar({ onSearch, onIndicators, onCompare, onAlerts, onSettings }: Props) {
-  const { panes, active, tf, candleKind, ccy, layout, compare, set } = useApp()
+  const { panes, active, tf, candleKind, ccy, layout, compare, templates, saveTemplate, applyTemplate, set } = useApp()
+  const onTemplate = (v: string) => {
+    if (v === '+') {
+      const name = window.prompt('Şablon adı (zaman dilimi, mum tipi ve indikatörler kaydedilir):')?.trim()
+      if (name) saveTemplate(name)
+    } else if (v) applyTemplate(+v)
+  }
   const replay = useReplay()
   const toggleReplay = () =>
     replay.active ? replay.set({ active: false, playing: false, selecting: false, cursor: -1 }) : replay.set({ active: true, selecting: true, playing: false, cursor: -1, pane: active })
@@ -32,9 +38,11 @@ export default function TopBar({ onSearch, onIndicators, onCompare, onAlerts, on
       <button className="btn border border-line" onClick={onSearch} title="Sembol Ara (Ctrl+K)">
         <Search size={14} /> <span className="font-semibold">{displayName(panes[active])}</span>
       </button>
-      <select className={`inp w-auto h-8 text-xs ${ccy !== 'ORG' ? 'border-acc text-[#5b8cff]' : ''}`} value={ccy} title="Grafik para birimi" onChange={(e) => set({ ccy: e.target.value as Ccy })}>
-        {CCYS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
-      </select>
+      <div className="flex">
+        {CCYS.map(([k, l, t]) => (
+          <button key={k} className={`btn px-2 ${ccy === k ? 'btn-on' : ''}`} title={`${t} (tekrar basınca orijinal para birimi)`} aria-label={t} onClick={() => set({ ccy: ccy === k ? 'ORG' : k })}>{l}</button>
+        ))}
+      </div>
       <div className="flex">
         {TIMEFRAMES.map((t) => (
           <button key={t} className={`btn px-1.5 ${tf === t ? 'btn-on' : ''}`} onClick={() => set({ tf: t })}>{t}</button>
@@ -44,6 +52,11 @@ export default function TopBar({ onSearch, onIndicators, onCompare, onAlerts, on
         {KINDS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
       </select>
       <button className="btn" onClick={onIndicators}><BarChart3 size={14} /> İndikatör</button>
+      <select className="inp w-24 shrink-0 h-8 text-xs" value="" title="Grafik şablonları" aria-label="Grafik şablonları" onChange={(e) => onTemplate(e.target.value)}>
+        <option value="">Kaydet ▾</option>
+        <option value="+">+ Şablon olarak kaydet</option>
+        {templates.map((t, i) => <option key={t.name} value={i}>{t.name}</option>)}
+      </select>
       <button className={`btn ${compare.length ? 'btn-on' : ''}`} onClick={onCompare}><GitCompareArrows size={14} /> Karşılaştır{compare.length ? ` (${compare.length})` : ''}</button>
       <div className="hidden md:flex">
         {LAYOUTS.map(([l, I]) => (

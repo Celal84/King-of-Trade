@@ -3,7 +3,8 @@ import type { Candle, Timeframe } from '../types'
 export interface Marker { timestamp: number; price: number; buy: boolean }
 
 export interface PaneApi {
-  draw: (name: string) => void
+  /** Çizim aracını başlatır; `data` emoji gibi araçların içeriğidir. */
+  draw: (name: string, data?: string) => void
   clear: () => void
   zoom: (factor: number) => void
   scalePrice: (factor: number) => void
@@ -13,6 +14,8 @@ export interface PaneApi {
   /** Zaman dilimini ayarlar ve son `ms` süreyi ekrana sığdırır. */
   fit: (ms: number, tf: Timeframe) => void
   undo: () => void
+  redo: () => void
+  goTo: (timestamp: number) => void
   screenshot: () => void
   /** Etkin indikatörün geçerli parametreleri ve çizgi sayısı. */
   /** Grafikte yüklü ham mum verisi. */

@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import Modal from './Modal'
-import { useApp } from '../store/app'
+import { DEFAULT_LOOK, useApp } from '../store/app'
 import { usePaper } from '../store/paper'
 import { telegram } from '../lib/notify'
 import CloudSyncSection from './CloudSyncSection'
 
 export default function SettingsModal({ onClose }: { onClose: () => void }) {
-  const { settings, setSettings } = useApp()
+  const { settings, setSettings, look, set } = useApp()
+  const setLook = (p: Partial<typeof look>) => set({ look: { ...look, ...p } })
   const reset = usePaper((s) => s.reset)
   const [msg, setMsg] = useState('')
   const test = async () => {
@@ -22,6 +23,15 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   return (
     <Modal title="Ayarlar" onClose={onClose}>
       <div className="space-y-3 text-xs">
+        <b>Grafik Görünümü</b>
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-1"><input type="checkbox" checked={look.grid} onChange={(e) => setLook({ grid: e.target.checked })} /> Izgara</label>
+          <label className="flex items-center gap-1"><input type="checkbox" checked={look.priceLine} onChange={(e) => setLook({ priceLine: e.target.checked })} /> Son fiyat çizgisi</label>
+          <label className="flex items-center gap-1">Yükseliş <input type="color" className="w-7 h-7 bg-transparent" value={look.up} onChange={(e) => setLook({ up: e.target.value })} /></label>
+          <label className="flex items-center gap-1">Düşüş <input type="color" className="w-7 h-7 bg-transparent" value={look.down} onChange={(e) => setLook({ down: e.target.value })} /></label>
+          <button className="btn border border-line" onClick={() => set({ look: DEFAULT_LOOK })}>Varsayılan</button>
+        </div>
+        <hr className="border-line" />
         {field('Veri Proxy URL (isteğe bağlı)', 'proxyUrl', 'https://king-of-trade.<hesap>.workers.dev')}
         <p className="text-mute">Boş bırakılırsa uygulamayla gelen Cloudflare Worker kullanılır; o da yanıt vermezse genel CORS proxy’leri ve anlık görüntü yedek olarak devreye girer.</p>
         {field('Telegram Bot Token', 'tgToken', '123456:ABC…', 'password')}
