@@ -3,7 +3,8 @@ import { Minus, Plus } from 'lucide-react'
 import Modal from './Modal'
 import { useApp, type IndicatorConfig } from '../store/app'
 import { paneApis } from '../lib/chartRegistry'
-import { INDICATOR_LABELS, LINE_PALETTE, MULTI_PARAM, PARAM_HINTS, paramLabel } from '../lib/indicators'
+import { INDICATOR_LABELS, LINE_PALETTE, MULTI_PARAM, PARAM_HINTS, PARAM_SPECS, normalizeParams, paramLabel } from '../lib/indicators'
+import { PIVOT_COLOR, PIVOT_LEVELS, type PivotLevel } from '../lib/pivot'
 import { TIMEFRAMES, type Timeframe } from '../types'
 
 type Tab = 'in' | 'style' | 'vis'
@@ -16,7 +17,7 @@ export default function IndicatorSettings({ name, onClose }: { name: string; onC
   // Varsayılan parametreler pencere açıldığında, ayar uygulanmadan önceki değerlerdir
   const info = useRef(paneApis.get(active)?.indicatorInfo(name) ?? { params: [], lines: 0, titles: [] }).current
   const [tab, setTab] = useState<Tab>('in')
-  const [params, setParams] = useState<number[]>(cfg.params ?? info.params)
+  const [params, setParams] = useState<number[]>(() => normalizeParams(name, cfg.params ?? info.params))
   const lines = Math.min(info.lines, 8)
   const put = (p: Partial<IndicatorConfig>) => setIndicatorConfig(name, { ...cfg, ...p })
   const setParam = (list: number[]) => {
@@ -44,8 +45,17 @@ export default function IndicatorSettings({ name, onClose }: { name: string; onC
   }
   const reset = () => {
     setIndicatorConfig(name, {})
-    setParams(info.params)
+    setParams(normalizeParams(name, name === 'PIVOT' ? [] : info.params))
   }
+  const specs = PARAM_SPECS[name] ?? []
+  const pivot = Array.from({ length: PIVOT_LEVELS.length }, (_, i) => (cfg.extra as PivotLevel[] | undefined)?.[i] ?? { color: PIVOT_COLOR, on: true })
+  const setPivot = (i: number, p: Partial<PivotLevel>) => put({ params, extra: at(pivot, i, { ...pivot[i], ...p }) })
+  const levelCell = (i: number) => (
+    <span key={i} className="flex items-center gap-1">
+      <input type="color" className="w-7 h-7 bg-transparent" value={pivot[i].color} aria-label={`${PIVOT_LEVELS[i]} rengi`} onChange={(e) => setPivot(i, { color: e.target.value })} />
+      <input type="checkbox" checked={pivot[i].on} aria-label={`${PIVOT_LEVELS[i]} göster`} onChange={(e) => setPivot(i, { on: e.target.checked })} />
+    </span>
+  )
   const cancel = () => {
     setIndicatorConfig(name, original.current)
     onClose()
@@ -60,11 +70,26 @@ export default function IndicatorSettings({ name, onClose }: { name: string; onC
           <div className="space-y-2">
             {params.length === 0 && <p className="text-mute">Bu indikatörün ayarlanabilir girdisi yok.</p>}
             {params.map((v, i) => (
-              <label key={i} className="flex items-center gap-2">
+              <label key={i} className="flex items-center gap-2 min-h-7">
                 <span className="flex-1">{paramLabel(name, i)}</span>
-                <input className="inp w-28" type="number" step="any" min="0" value={Number.isFinite(v) ? v : ''} onChange={(e) => setParam(at(params, i, parseFloat(e.target.value)))} />
+                {specs[i]?.options ? (
+                  <select className="inp w-32" value={v} onChange={(e) => setParam(at(params, i, +e.target.value))}>
+                    {specs[i].options!.map((o, j) => <option key={o} value={j}>{o}</option>)}
+                  </select>
+                ) : specs[i]?.bool ? <input type="checkbox" checked={!!v} onChange={(e) => setParam(at(params, i, +e.target.checked))} />
+                  : <input className="inp w-28" type="number" step="any" min="0" value={Number.isFinite(v) ? v : ''} onChange={(e) => setParam(at(params, i, parseFloat(e.target.value)))} />}
               </label>
             ))}
+            {name === 'PIVOT' && (
+              <div className="space-y-1 pt-2 border-t border-line">
+                <p className="text-mute uppercase text-[10px]">Seviyeler</p>
+                <div className="flex items-center gap-2"><span className="flex-1">P</span>{levelCell(0)}<span className="w-[52px]" /></div>
+                {[1, 3, 5, 7, 9].map((i) => (
+                  <div key={i} className="flex items-center gap-2"><span className="flex-1">{PIVOT_LEVELS[i]} / {PIVOT_LEVELS[i + 1]}</span>{levelCell(i)}{levelCell(i + 1)}</div>
+                ))}
+                <p className="text-mute">Gün içi grafiklerde dönem değerleri günlük mumlardan hesaplanır. Seçilen tipte olmayan seviyeler çizilmez.</p>
+              </div>
+            )}
             {MULTI_PARAM[name] && (
               <div className="flex gap-1">
                 <button className="btn border border-line" onClick={() => setParam([...params, (params.at(-1) ?? 10) * 2])}><Plus size={13} /> Ekle</button>

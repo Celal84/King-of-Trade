@@ -20,6 +20,7 @@ BIST 100, Emtia, Sentetik TR pariteleri ve canlı Kripto destekli, açık kaynak
 - **İndikatör ayar penceresi:** Girdiler (adlandırılmış parametreler, periyot ekle/kaldır), Stil (çizgi başına görünürlük, renk, kalınlık, düz/kesikli), Görünürlük (zaman dilimine göre); İptal / Tamam / sıfırla.
 - **Genel ayarlar:** Sembol, Durum çizgisi, Ölçekler, Kanvas, Alarmlar ve Veri sekmeleri (renkler, ızgara, artı imleç, yazı boyutu, arka plan, başlık öğeleri, ses/bildirim).
 - **İzleme listesi:** bölümlere ayırma (aç/kapat, yeniden adlandır), + ile arama penceresinden ekleme, satırdan çıkarma, sürükleyerek sıralama; seçilen sembolün ayrıntı kartı (fiyat, 52 haftalık aralık, temel ve performans verileri, endeks üyelikleri).
+- **Pivot Noktaları:** Geleneksel, Fibonacci, Woodie, Klasik, DM ve Camarilla tipleri; günlük–yıllık dönem, geriye dönük pivot sayısı, etiket/fiyat gösterimi ve konumu, çizgi kalınlığı, seviye bazında renk ve görünürlük; gün içi grafikte dönem değerleri günlük mumlardan.
 - **Sunucu taraflı alarmlar:** fiyat, RSI, günlük % değişim, EMA üstü/altı, EMA/SMA kesişimi, yatay çizgiye dokunma; VE/VEYA ile çoklu koşul. Alarmlar Cloudflare Worker'da saklanır, uygulama kapalıyken de Telegram'a gönderilir.
 - **Çok koşullu tarama:** alan + operatör + değer satırları (ör. F/K < 10, RSI < 30), isimle kaydedilen filtreler.
 - **Bulut senkronu:** listeler, çizimler, şablonlar, tarama filtreleri, Pine scriptleri ve sanal portföy "senkron kodu" ile yedeklenir ve başka cihazda geri yüklenir.

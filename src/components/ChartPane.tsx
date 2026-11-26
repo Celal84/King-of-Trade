@@ -68,6 +68,7 @@ export default function ChartPane({ index }: { index: number }) {
   const pinePanes = useRef(new Map<string, string>())
   const redoStack = useRef<SavedDrawing[]>([])
   const prevConfig = useRef(useApp.getState().indicatorConfig)
+  const pivotDaily = useRef<Candle[]>()
   const brushPath = useRef<{ x: number; y: number }[] | null>(null)
   const [brush, setBrush] = useState(false)
   const [status, setStatus] = useState<'loading' | 'ok' | 'error'>('loading')
@@ -352,6 +353,7 @@ export default function ChartPane({ index }: { index: number }) {
     const lines = cfg?.colors?.map((color, i) =>
       cfg.hidden?.[i] ? lineStyle('transparent') : { ...lineStyle(color || LINE_PALETTE[i % LINE_PALETTE.length], cfg.sizes?.[i] ?? 1), style: cfg.dashed?.[i] ? 'dashed' : 'solid', dashedValue: [4, 4] })
     return {
+      ...(name === 'PIVOT' ? { extendData: { daily: pivotDaily.current, levels: cfg?.extra } } : {}),
       ...(cfg?.params?.length ? { calcParams: cfg.params } : {}),
       ...(lines?.length ? { styles: { lines } as never } : {}),
     }
@@ -394,6 +396,22 @@ export default function ChartPane({ index }: { index: number }) {
     syncIndicators()
     indis.current.forEach((pane, name) => chart.current?.overrideIndicator({ name, ...configOf(name) }, pane))
   }, [indicatorConfig, tf])
+
+  // Gün içi grafikte pivot dönemleri (ör. yıllık) için daha uzun geçmişli günlük mumlar yüklenir
+  useEffect(() => {
+    pivotDaily.current = undefined
+    if (!indicators.includes('PIVOT') || status !== 'ok' || ['1d', '1w', '1M'].includes(tf)) return
+    let alive = true
+    MarketRouter.getCandles(symbol, '1d', ccy).then((list) => {
+      const pane = indis.current.get('PIVOT')
+      if (!alive || !pane) return
+      pivotDaily.current = list
+      chart.current?.overrideIndicator({ name: 'PIVOT', ...configOf('PIVOT') }, pane)
+    }).catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [indicators, symbol, tf, ccy, status])
 
   useEffect(() => {
     const c = chart.current
