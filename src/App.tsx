@@ -16,6 +16,7 @@ import { usePriceFeed } from './hooks/usePriceFeed'
 import { useAlertEngine } from './hooks/useAlertEngine'
 import { useCryptoUniverse } from './hooks/useCrypto'
 import { useReplay } from './store/replay'
+import { useCloudSync } from './lib/sync'
 
 type ModalKind = 'search' | 'compare' | 'indicators' | 'alerts' | 'settings' | null
 
@@ -30,6 +31,7 @@ export default function App() {
   usePriceFeed()
   useAlertEngine()
   useCryptoUniverse()
+  useCloudSync()
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {

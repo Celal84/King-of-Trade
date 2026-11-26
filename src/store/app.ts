@@ -16,6 +16,8 @@ interface Settings {
   tgToken: string
   tgChat: string
   syncCode?: string
+  syncOn?: boolean
+  syncAt?: number
 }
 
 const PANES = ['THYAO.IS', 'BTCUSDT', 'GAUTRY', 'XU100.IS', 'USDTRY=X', 'ETHUSDT']
