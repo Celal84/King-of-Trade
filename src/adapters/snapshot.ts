@@ -1,5 +1,5 @@
 import type { Candle, Fundamentals, Quote, Timeframe, Universe } from '../types'
-import { aggregate, bucket, monthBucket, type Bucket } from '../lib/candles'
+import { aggregate, bucket, dropEmpty, monthBucket, type Bucket } from '../lib/candles'
 import { useApp } from '../store/app'
 import { cached, getJson } from './http'
 
@@ -32,7 +32,7 @@ export const Snapshot = {
     const [interval, by] = SOURCE[tf]
     // 1 dakikalık dosya yalnızca endeksler, BIST 100 ve emtia için üretilir; yoksa 5 dakikalığa düşülür
     const f = await chartFile(symbol, interval).catch((e) => (interval === '1m' ? chartFile(symbol, '5m') : Promise.reject(e)))
-    const list = f.k.map(([t, open, high, low, close, volume]) => ({ timestamp: t * 1000, open, high, low, close, volume }))
+    const list = dropEmpty(symbol, interval, f.k.map(([t, open, high, low, close, volume]) => ({ timestamp: t * 1000, open, high, low, close, volume })))
     return by ? aggregate(list, by) : list
   },
 
