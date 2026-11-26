@@ -104,8 +104,8 @@ export default function Watchlist({ onPick }: { onPick?: () => void }) {
                 onClick={() => setClosed(shut ? closed.filter((x) => x !== name) : [...closed, name])}>
                 {shut ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
                 <span className="flex-1">{name}</span>
-                <button className="md:opacity-0 md:group-hover:opacity-100" aria-label="Bölümü yeniden adlandır" onClick={(e) => { e.stopPropagation(); const n = ask('Bölüm adı:', name); if (n) renameSection(name, n) }}><Pencil size={12} /></button>
-                <button className="md:opacity-0 md:group-hover:opacity-100" aria-label="Bölümü sil" onClick={(e) => (e.stopPropagation(), removeEntry(index))}><Trash2 size={12} /></button>
+                <button className="[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100" aria-label="Bölümü yeniden adlandır" onClick={(e) => { e.stopPropagation(); const n = ask('Bölüm adı:', name); if (n) renameSection(name, n) }}><Pencil size={12} /></button>
+                <button className="[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100" aria-label="Bölümü sil" onClick={(e) => (e.stopPropagation(), removeEntry(index))}><Trash2 size={12} /></button>
               </li>
             )
           }
@@ -127,7 +127,7 @@ export default function Watchlist({ onPick }: { onPick?: () => void }) {
               <div className={`w-16 text-right text-xs tabular-nums ${(q?.change ?? 0) >= 0 ? 'text-up' : 'text-down'}`}>{q ? `${q.change >= 0 ? '+' : ''}${fmt(q.change, 2)}%` : ''}</div>
               <span className="flex justify-end gap-1.5 w-10">
                 <button className="text-mute hover:text-txt" aria-label={`${displayName(s.symbol)} ayrıntıları`} onClick={(e) => (e.stopPropagation(), setDetail(s.symbol))}><Info size={13} /></button>
-                {fav && <button className="md:opacity-0 md:group-hover:opacity-100 text-mute hover:text-down" aria-label={`${displayName(s.symbol)} listeden çıkar`} onClick={(e) => (e.stopPropagation(), removeEntry(index))}><Trash2 size={13} /></button>}
+                {fav && <button className="[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 text-mute hover:text-down" aria-label={`${displayName(s.symbol)} listeden çıkar`} onClick={(e) => (e.stopPropagation(), removeEntry(index))}><Trash2 size={13} /></button>}
               </span>
             </li>
           )

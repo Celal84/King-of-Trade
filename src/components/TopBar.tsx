@@ -1,4 +1,4 @@
-import { BarChart3, Bell, Columns2, Columns3, Crown, GitCompareArrows, Grid3x3, History, LayoutGrid, Search, Settings, Square } from 'lucide-react'
+import { BarChart3, List, Maximize, Bell, Columns2, Columns3, Crown, GitCompareArrows, Grid3x3, History, LayoutGrid, Search, Settings, Square } from 'lucide-react'
 import pkg from '../../package.json'
 import { useApp } from '../store/app'
 import { useReplay } from '../store/replay'
@@ -16,9 +16,11 @@ interface Props {
   onCompare: () => void
   onAlerts: () => void
   onSettings: () => void
+  /** Yatay telefon düzeninde liste panelini açıp kapatır. */
+  onList?: () => void
 }
 
-export default function TopBar({ onSearch, onIndicators, onCompare, onAlerts, onSettings }: Props) {
+export default function TopBar({ onSearch, onIndicators, onCompare, onAlerts, onSettings, onList }: Props) {
   const { panes, active, tf, candleKind, ccy, layout, compare, templates, saveTemplate, applyTemplate, set } = useApp()
   const onTemplate = (v: string) => {
     if (v === '+') {
@@ -35,6 +37,8 @@ export default function TopBar({ onSearch, onIndicators, onCompare, onAlerts, on
         <Crown size={18} className="text-yellow-400" />
         <span className="whitespace-nowrap">King of Trade <span className="text-mute font-normal text-xs">v{pkg.version}</span></span>
       </div>
+      {onList && <button className="btn border border-line" onClick={onList} aria-label="Liste ve paneller"><List size={14} /> Liste</button>}
+      {onList && <button className="btn border border-line" aria-label="Tam ekran" onClick={() => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.())}><Maximize size={14} /></button>}
       <button className="btn border border-line" onClick={onSearch} title="Sembol Ara (Ctrl+K)">
         <Search size={14} /> <span className="font-semibold">{displayName(panes[active])}</span>
       </button>
