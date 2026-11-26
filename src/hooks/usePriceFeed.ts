@@ -20,7 +20,7 @@ export function usePriceFeed() {
   useEffect(() => {
     let alive = true
     const run = () =>
-      MarketRouter.streamQuotes(tracked(), (q) => {
+      !document.hidden && MarketRouter.streamQuotes(tracked(), (q) => {
         if (!alive) return
         useApp.getState().setPrices(q)
         usePaper.getState().check(useApp.getState().prices)

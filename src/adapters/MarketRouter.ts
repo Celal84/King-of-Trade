@@ -41,6 +41,7 @@ export const MarketRouter = {
   subscribe(symbol: string, tf: Timeframe, cb: (c: Candle) => void, ccy: Ccy = 'ORG'): () => void {
     if (getSymbol(symbol).source === 'binance' && !fxOf(symbol, ccy)) return BinanceAdapter.subscribe(symbol, tf, cb)
     const id = setInterval(() => {
+      if (document.hidden) return
       MarketRouter.getCandles(symbol, tf, ccy).then((l) => l.length && cb(l[l.length - 1])).catch(() => undefined)
     }, POLL_MS)
     return () => clearInterval(id)

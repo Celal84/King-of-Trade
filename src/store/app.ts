@@ -11,6 +11,7 @@ interface Settings {
   proxyUrl: string
   tgToken: string
   tgChat: string
+  syncCode?: string
 }
 
 const PANES = ['THYAO.IS', 'BTCUSDT', 'GAUTRY', 'XU100.IS', 'USDTRY=X', 'ETHUSDT']
