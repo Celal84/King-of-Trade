@@ -16,7 +16,7 @@ const GROUPS: [string, LucideIcon, [string, string][]][] = [
 ]
 
 export default function DrawingToolbar() {
-  const { active, magnet, drawingsVisible, set } = useApp()
+  const { active, magnet, drawingsVisible, drawColor, drawSize, set } = useApp()
   const [open, setOpen] = useState<{ i: number; top: number } | null>(null)
   const api = () => paneApis.get(active)
   const tool = (title: string, I: LucideIcon, onClick: () => void, cls = '') => (
@@ -33,6 +33,9 @@ export default function DrawingToolbar() {
       {tool(drawingsVisible ? 'Çizimleri gizle' : 'Çizimleri göster', drawingsVisible ? Eye : EyeOff, () => set({ drawingsVisible: !drawingsVisible }))}
       {tool('Son çizimi sil', Undo2, () => api()?.undo())}
       {tool('Tüm çizimleri temizle', Trash2, () => confirm('Bu sembolün tüm çizimleri silinsin mi?') && api()?.clear(), 'text-down')}
+      <div className="w-6 border-t border-line my-1" />
+      <input type="color" className="w-7 h-7 bg-transparent shrink-0" title="Çizim rengi" value={drawColor} onChange={(e) => set({ drawColor: e.target.value })} />
+      <button className="btn px-0 w-8 justify-center" title="Çizgi kalınlığı" onClick={() => set({ drawSize: (drawSize % 4) + 1 })}>{drawSize}px</button>
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(null)} />

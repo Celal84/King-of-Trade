@@ -15,7 +15,8 @@ export default function AlertsPanel({ onClose }: { onClose: () => void }) {
   const [value, setValue] = useState(() => String(prices[symbol]?.price ?? ''))
   const onKind = (k: AlertKind) => {
     setKind(k)
-    setValue(k === 'rsi_below' ? '30' : k === 'rsi_above' ? '70' : String(prices[symbol]?.price ?? ''))
+    const preset: Partial<Record<AlertKind, string>> = { rsi_below: '30', rsi_above: '70', change_above: '5', change_below: '-5', ema_above: '50', ema_below: '50' }
+    setValue(preset[k] ?? String(prices[symbol]?.price ?? ''))
   }
   const submit = () => {
     const v = parseFloat(value.replace(',', '.'))

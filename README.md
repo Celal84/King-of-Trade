@@ -12,7 +12,9 @@ BIST 100, Emtia, Sentetik TR pariteleri ve canlı Kripto destekli, açık kaynak
 - **Karşılaştırma:** 4 sembole kadar yüzde ölçeğinde üst üste; **indikatör ayarları** (periyot ve renk); **çoklu izleme listesi**.
 - **Kripto:** tüm Binance spot pariteleri (USDT / TRY / USDC / FDUSD), hacme göre listeler ve kripto taraması (canlı).
 - **Zaman dilimleri:** 1m, 5m, 15m, 30m, 1h, 2h, 4h, 1d, 1w, 1M; 6 grafiğe kadar çoklu düzen; ekran görüntüsü ve tam ekran.
-- **Bar Replay**, **Alarmlar** (fiyat ve RSI; ses + bildirim + Telegram), `Ctrl+K` sembol arama.
+- **Ek indikatörler:** Hacim Profili (görünen aralık), Pivot Noktaları Standart, Chaikin Money Flow, VWAP, SuperTrend, Ichimoku, Stokastik RSI, MFI, Donchian, Keltner, Hull MA; grafik şablonları.
+- **Fiyat cetveli:** sağdaki cetveli parmakla/fareyle sürükleyerek ölçekleme, çift dokunuşla otomatik.
+- **Bar Replay**, **Alarmlar** (fiyat, RSI, günlük % değişim, EMA üstü/altı; ses + bildirim + Telegram), `Ctrl+K` sembol arama.
 
 ## Geliştirme
 ```bash
