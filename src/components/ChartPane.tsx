@@ -191,6 +191,17 @@ export default function ChartPane({ index }: { index: number }) {
         a.download = `${displayName(symRef.current.replace(':', '_'))}_${useApp.getState().tf}.png`
         a.click()
       },
+      candles: () => raw.current,
+      markers: (list) => {
+        c.removeOverlay({ groupId: 'kot-bt' })
+        list.slice(-300).forEach((m) => {
+          const color = m.buy ? '#26a69a' : '#ef5350'
+          c.createOverlay({
+            name: 'simpleAnnotation', groupId: 'kot-bt', lock: true, extendData: m.buy ? 'AL' : 'SAT', points: [{ timestamp: m.timestamp, value: m.price }],
+            styles: { line: { color }, polygon: { color }, text: { color: '#ffffff', backgroundColor: color } },
+          })
+        })
+      },
       indicatorInfo: (name) => {
         const pane = indis.current.get(name)
         const ind = pane ? (c.getIndicatorByPaneId(pane, name) as { calcParams: number[]; figures: { type?: string }[] } | null) : null

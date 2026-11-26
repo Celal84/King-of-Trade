@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { CandleKind, Ccy, Layout, Quote, Timeframe } from '../types'
 
-export type PanelTab = 'watch' | 'scan' | 'fund' | 'paper'
+export type PanelTab = 'watch' | 'scan' | 'fund' | 'paper' | 'test'
 export interface WatchList { name: string; symbols: string[] }
 export interface IndicatorConfig { params?: number[]; colors?: string[] }
 export interface Template { name: string; tf: Timeframe; candleKind: CandleKind; logScale: boolean; indicators: string[]; indicatorConfig: Record<string, IndicatorConfig> }
