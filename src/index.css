@@ -3,9 +3,8 @@
 @tailwind utilities;
 
 html, body { height: 100%; margin: 0; background: #131722; color: #d1d4dc; overscroll-behavior: none; overflow: hidden; }
-/* Sabit konum + dinamik görünüm yüksekliği: adres çubuğu gizlenince ve ekran döndürülünce alan tam dolar */
-body { position: fixed; inset: 0; width: 100%; }
-#root { height: 100%; height: 100dvh; width: 100%; overflow: hidden; }
+/* Uygulama kabuğu görünen alana sabitlenir; yükseklik main.tsx'te visualViewport'tan piksel olarak verilir */
+#root { position: fixed; top: 0; left: 0; width: 100%; height: var(--app-h, 100%); overflow: hidden; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
 .safe { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
 .no-scrollbar::-webkit-scrollbar { display: none; }
