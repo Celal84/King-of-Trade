@@ -32,6 +32,12 @@ export function aggregate(list: Candle[], by: Bucket): Candle[] {
   return out
 }
 
+/** BIST gün içi verisinde kapanış seansından gelen hacimsiz, tek fiyatlı boş mumları ayıklar. */
+export const dropEmpty = (symbol: string, interval: string, list: Candle[]): Candle[] =>
+  symbol.endsWith('.IS') && interval.endsWith('m')
+    ? list.filter((c) => c.volume > 0 || c.high !== c.low || c.open !== c.close)
+    : list
+
 export function mergeCandle(list: Candle[], c: Candle): Candle[] {
   const last = list[list.length - 1]
   if (!last || c.timestamp > last.timestamp) return [...list, c]

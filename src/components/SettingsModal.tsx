@@ -21,8 +21,8 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   return (
     <Modal title="Ayarlar" onClose={onClose}>
       <div className="space-y-3 text-xs">
-        {field('Yahoo Proxy URL (Cloudflare Worker)', 'proxyUrl', 'https://yahoo-proxy.<hesap>.workers.dev')}
-        <p className="text-mute">Boş bırakılırsa genel CORS proxy’leri (yedekli) kullanılır. Kendi proxy’niz için repodaki <code>worker/yahoo-proxy.js</code> dosyasını Cloudflare Workers’a yükleyin.</p>
+        {field('Veri Proxy URL (isteğe bağlı)', 'proxyUrl', 'https://king-of-trade.<hesap>.workers.dev')}
+        <p className="text-mute">Boş bırakılırsa uygulamayla gelen Cloudflare Worker kullanılır; o da yanıt vermezse genel CORS proxy’leri ve anlık görüntü yedek olarak devreye girer.</p>
         {field('Telegram Bot Token', 'tgToken', '123456:ABC…', 'password')}
         {field('Telegram Chat ID', 'tgChat', '123456789')}
         <button className="btn border border-line" onClick={test}>Telegram Test</button>

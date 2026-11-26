@@ -1,5 +1,5 @@
 import type { Candle, Fundamentals, Quote, Timeframe } from '../types'
-import { aggregate, bucket } from '../lib/candles'
+import { aggregate, bucket, dropEmpty } from '../lib/candles'
 import { hasLiveSource, proxiedJson } from './http'
 import { Snapshot } from './snapshot'
 import { useApp } from '../store/app'
@@ -70,7 +70,8 @@ const Live = {
       if (o == null || h == null || l == null || c == null) return
       out.push({ timestamp: t * 1000, open: o, high: Math.max(h, c), low: Math.min(l, c), close: c, volume: q.volume[i] ?? 0 })
     })
-    return agg ? aggregate(out, bucket(agg)) : out
+    const list = dropEmpty(symbol, interval, out)
+    return agg ? aggregate(list, bucket(agg)) : list
   },
 
   async getQuotes(symbols: string[]): Promise<Record<string, Quote>> {

@@ -29,6 +29,14 @@ jobs:
       - name: BIST hisse listesini güncelle
         continue-on-error: true
         run: node scripts/snapshot.mjs universe src/data/bist.json
+      - name: Worker adresini bul
+        continue-on-error: true
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          SUB=$(curl -sf -H "Authorization: Bearer $CF_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/subdomain" | jq -r '.result.subdomain // empty')
+          [ -n "$SUB" ] && echo "VITE_PROXY_URL=https://king-of-trade.$SUB.workers.dev" >> "$GITHUB_ENV"
       - run: npm run build
       - name: Piyasa verisi anlık görüntüsü
         continue-on-error: ${{ github.event_name != 'schedule' }}

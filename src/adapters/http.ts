@@ -17,15 +17,18 @@ const TIMEOUT = 8_000
 const cache = new Map<string, { t: number; p: Promise<unknown> }>()
 let preferred = 0
 
-const customProxy = () => useApp.getState().settings.proxyUrl.trim()
+const DEFAULT_PROXY: string = import.meta.env.VITE_PROXY_URL || ''
 
-/** Canlı kaynak (native HTTP veya kullanıcının proxy'si) tanımlı mı? */
-export const hasLiveSource = () => Capacitor.isNativePlatform() || !!customProxy()
+/** Kendi Worker adresi: ayarlardaki değer, yoksa derlemeyle gelen varsayılan. */
+export const workerUrl = () => (useApp.getState().settings.proxyUrl.trim() || DEFAULT_PROXY).replace(/\/+$/, '')
+
+/** Canlı kaynak (native HTTP veya kendi proxy'miz) tanımlı mı? */
+export const hasLiveSource = () => Capacitor.isNativePlatform() || !!workerUrl()
 
 function proxies(): Proxy[] {
   if (Capacitor.isNativePlatform()) return [{ wrap: (u) => u }]
-  const custom = customProxy()
-  return custom ? [{ wrap: (u) => `${custom}${custom.includes('?') ? '&' : '?'}url=${enc(u)}` }] : PUBLIC
+  const own = workerUrl()
+  return own ? [{ wrap: (u) => `${own}/?url=${enc(u)}` }, ...PUBLIC] : PUBLIC
 }
 
 export async function getJson(url: string, timeout = TIMEOUT): Promise<unknown> {
@@ -34,18 +37,23 @@ export async function getJson(url: string, timeout = TIMEOUT): Promise<unknown> 
   return r.json()
 }
 
+const markProxy = (down: boolean) => useApp.getState().proxyDown !== down && useApp.getState().set({ proxyDown: down })
+
 async function tryAll(url: string): Promise<unknown> {
   const ps = proxies()
+  const own = !Capacitor.isNativePlatform() && !!workerUrl()
   let err: unknown
   for (let n = 0; n < ps.length; n++) {
-    const i = (n + preferred) % ps.length
+    const i = own ? n : (n + preferred) % ps.length
     try {
       const body = await getJson(ps[i].wrap(url))
       const j = ps[i].unwrap ? ps[i].unwrap!(body) : body
-      preferred = i
+      if (own) markProxy(i !== 0)
+      else preferred = i
       return j
     } catch (e) {
       err = e
+      if (own && i === 0) markProxy(true)
     }
   }
   throw err instanceof Error ? err : new Error('Proxy hatası')

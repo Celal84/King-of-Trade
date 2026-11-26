@@ -3,6 +3,7 @@ import pkg from '../../package.json'
 import { useApp } from '../store/app'
 import { useReplay } from '../store/replay'
 import { displayName } from '../data/symbols'
+import UpdateButton from './UpdateButton'
 import { TIMEFRAMES, type CandleKind, type Ccy, type Layout } from '../types'
 
 const KINDS: [CandleKind, string][] = [['candle', 'Mum'], ['hollow', 'Hollow'], ['heikin', 'Heikin Ashi'], ['line', 'Çizgi'], ['area', 'Alan']]
@@ -51,6 +52,7 @@ export default function TopBar({ onSearch, onIndicators, onCompare, onAlerts, on
       </div>
       <button className={`btn ${replay.active ? 'btn-on' : ''}`} onClick={toggleReplay}><History size={14} /> Replay</button>
       <button className="btn" onClick={onAlerts}><Bell size={14} /> Alarm</button>
+      <UpdateButton />
       <button className="btn" onClick={onSettings} aria-label="Ayarlar"><Settings size={14} /></button>
     </header>
   )
