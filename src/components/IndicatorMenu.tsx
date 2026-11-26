@@ -5,25 +5,25 @@ import Modal from './Modal'
 import { useApp } from '../store/app'
 import { COMPARE_SLOTS, MAIN_PANE_INDICATORS } from '../lib/klineSetup'
 import { paneApis } from '../lib/chartRegistry'
-import { INDICATOR_LABELS } from '../lib/indicators'
+import { INDICATOR_LABELS, PARAM_HINTS } from '../lib/indicators'
 
 const POPULAR = ['MA', 'EMA', 'BOLL', 'VWAP', 'SUPERTREND', 'ICHIMOKU', 'PIVOT', 'VPVR', 'VOL', 'MACD', 'RSI', 'STOCHRSI', 'CMF', 'MFI', 'ATR', 'SAR', 'DONCHIAN', 'KELTNER', 'HMA', 'KDJ', 'CCI', 'OBV']
 const PALETTE = ['#ff9600', '#935ebd', '#2196f3', '#e11d74', '#01c5c4']
 
-function Editor({ name }: { name: string }) {
+export function Editor({ name }: { name: string }) {
   const { active, indicatorConfig, setIndicatorConfig } = useApp()
   const info = paneApis.get(active)?.indicatorInfo(name)
   const cfg = indicatorConfig[name] ?? {}
   const [params, setParams] = useState((cfg.params ?? info?.params ?? []).join(', '))
   const colors = Array.from({ length: Math.min(info?.lines ?? 0, 5) }, (_, i) => cfg.colors?.[i] ?? PALETTE[i])
   const apply = (next: { params?: string; colors?: string[] }) => {
-    const p = (next.params ?? params).split(/[\s,;]+/).map(Number).filter((n) => isFinite(n) && n > 0)
+    const p = (next.params ?? params).split(/[\s,;]+/).map(Number).filter((n) => isFinite(n) && n >= 0)
     setIndicatorConfig(name, { params: p.length ? p : undefined, colors: next.colors ?? cfg.colors })
   }
   return (
     <div className="p-2 mb-1 rounded border border-line space-y-2">
       <label className="block">
-        <span className="text-mute">Periyotlar (virgülle; MA ve EMA’da istediğiniz kadar)</span>
+        <span className="text-mute">{PARAM_HINTS[name] ?? 'Periyotlar (virgülle; MA ve EMA’da istediğiniz kadar)'}</span>
         <input className="inp mt-1" inputMode="decimal" value={params} onChange={(e) => setParams(e.target.value)} onBlur={() => apply({})} onKeyDown={(e) => e.key === 'Enter' && apply({})} />
       </label>
       {colors.length > 0 && (
@@ -36,6 +36,18 @@ function Editor({ name }: { name: string }) {
       )}
       <button className="btn border border-line" onClick={() => (setIndicatorConfig(name, {}), setParams((info?.params ?? []).join(', ')))}>Varsayılana dön</button>
     </div>
+  )
+}
+
+export function IndicatorSettings({ name, onClose }: { name: string; onClose: () => void }) {
+  const toggleIndicator = useApp((s) => s.toggleIndicator)
+  return (
+    <Modal title={`${INDICATOR_LABELS[name] ?? name} — Ayarlar`} onClose={onClose}>
+      <div className="text-xs">
+        <Editor name={name} />
+        <button className="btn border border-down text-down" onClick={() => (toggleIndicator(name), onClose())}>İndikatörü kaldır</button>
+      </div>
+    </Modal>
   )
 }
 

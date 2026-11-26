@@ -9,8 +9,8 @@ const GROUPS: [string, LucideIcon, [string, string][]][] = [
     ['horizontalStraightLine', 'Yatay Çizgi'], ['horizontalRayLine', 'Yatay Işın'], ['horizontalSegment', 'Yatay Parça'],
     ['verticalStraightLine', 'Dikey Çizgi'], ['priceLine', 'Fiyat Çizgisi'],
   ]],
-  ['Kanal ve Fibonacci', GitFork, [['parallelStraightLine', 'Paralel Kanal'], ['priceChannelLine', 'Fiyat Kanalı'], ['fibonacciLine', 'Fibonacci Düzeltmesi']]],
-  ['Şekiller', Shapes, [['kotRect', 'Dikdörtgen'], ['kotCircle', 'Daire'], ['kotTriangle', 'Üçgen']]],
+  ['Kanal ve Fibonacci', GitFork, [['parallelStraightLine', 'Paralel Kanal'], ['priceChannelLine', 'Fiyat Kanalı'], ['fibonacciLine', 'Fibonacci Düzeltmesi'], ['kotFibExt', 'Fibonacci Uzatması (A → B → C)'], ['kotGann', 'Gann Yelpazesi']]],
+  ['Şekiller', Shapes, [['kotRect', 'Dikdörtgen'], ['kotCircle', 'Daire'], ['kotTriangle', 'Üçgen'], ['kotWave', 'Dalga (0–5, altı nokta)']]],
   ['Ölçüm ve Pozisyon', Ruler, [['kotMeasure', 'Fiyat Ölçer'], ['kotPosition', 'Al/Sat Pozisyonu (giriş → hedef → stop)']]],
   ['Metin ve Not', Type, [['kotText', 'Metin'], ['simpleAnnotation', 'Not (ok işaretli)'], ['simpleTag', 'Fiyat Etiketi']]],
 ]

@@ -7,7 +7,8 @@ import ReplayBar from './components/ReplayBar'
 import BottomBar from './components/BottomBar'
 import MobileNav from './components/MobileNav'
 import SymbolSearch from './components/SymbolSearch'
-import IndicatorMenu from './components/IndicatorMenu'
+import IndicatorMenu, { IndicatorSettings } from './components/IndicatorMenu'
+import { useApp } from './store/app'
 import AlertsPanel from './components/AlertsPanel'
 import SettingsModal from './components/SettingsModal'
 import { useIsMobile } from './hooks/useIsMobile'
@@ -21,6 +22,7 @@ type ModalKind = 'search' | 'compare' | 'indicators' | 'alerts' | 'settings' | n
 export default function App() {
   const mobile = useIsMobile()
   const replay = useReplay((s) => s.active)
+  const editIndicator = useApp((s) => s.editIndicator)
   const [modal, setModal] = useState<ModalKind>(null)
   const [drawer, setDrawer] = useState(false)
   const close = () => setModal(null)
@@ -58,6 +60,7 @@ export default function App() {
       {modal === 'search' && <SymbolSearch onClose={close} />}
       {modal === 'compare' && <SymbolSearch onClose={close} compareMode />}
       {modal === 'indicators' && <IndicatorMenu onClose={close} />}
+      {editIndicator && <IndicatorSettings name={editIndicator} onClose={() => useApp.getState().set({ editIndicator: null })} />}
       {modal === 'alerts' && <AlertsPanel onClose={close} />}
       {modal === 'settings' && <SettingsModal onClose={close} />}
     </div>

@@ -48,6 +48,13 @@ function periodKey(dt: number): (t: number) => string {
 }
 
 export const CUSTOM_MAIN = ['VWAP', 'SUPERTREND', 'ICHIMOKU', 'DONCHIAN', 'KELTNER', 'HMA', 'PIVOT', 'VPVR']
+export const PARAM_HINTS: Record<string, string> = {
+  PIVOT: 'Dönem: 0 otomatik · 1 günlük · 2 haftalık · 3 aylık · 4 yıllık',
+  VPVR: 'Satır sayısı, mum sayısı (0 = ekranda görünen aralık; ör. 24, 200 = son 200 mum)',
+  SUPERTREND: 'ATR periyodu, çarpan', ICHIMOKU: 'Tenkan, Kijun, Senkou B', KELTNER: 'Periyot, ATR çarpanı', STOCHRSI: 'RSI, Stokastik, %K, %D',
+}
+const PIVOT_KEYS = [undefined, 60_000, 3_600_000, DAY, 7 * DAY]
+
 export const INDICATOR_LABELS: Record<string, string> = {
   VPVR: 'Hacim Profili (görünen aralık)', PIVOT: 'Pivot Noktaları Standart', CMF: 'Chaikin Money Flow', VWAP: 'VWAP', SUPERTREND: 'SuperTrend',
   ICHIMOKU: 'Ichimoku Bulutu', STOCHRSI: 'Stokastik RSI', MFI: 'Money Flow Index', DONCHIAN: 'Donchian Kanalı', KELTNER: 'Keltner Kanalı', HMA: 'Hull MA',
@@ -156,6 +163,27 @@ export function registerCustomIndicators() {
   registerIndicator<Row>({
     name: 'ICHIMOKU', shortName: 'Ichimoku', calcParams: [9, 26, 52],
     figures: [line('tenkan', 'Tenkan: '), line('kijun', 'Kijun: '), line('spanA', 'Senkou A: '), line('spanB', 'Senkou B: '), line('chikou', 'Chikou: ')],
+    // Senkou A ile B arasını bulut olarak boyar (A üstteyse yeşil, alttaysa kırmızı)
+    draw: ({ ctx, indicator, visibleRange, xAxis, yAxis }) => {
+      const r = indicator.result as Row[]
+      ctx.save()
+      ctx.globalAlpha = 0.14
+      for (let n = Math.max(1, visibleRange.from); n < visibleRange.to; n++) {
+        const [p, c] = [r[n - 1], r[n]]
+        if (p?.spanA === undefined || p.spanB === undefined || c?.spanA === undefined || c.spanB === undefined) continue
+        const [x1, x2] = [xAxis.convertToPixel(n - 1), xAxis.convertToPixel(n)]
+        ctx.fillStyle = c.spanA >= c.spanB ? '#26a69a' : '#ef5350'
+        ctx.beginPath()
+        ctx.moveTo(x1, yAxis.convertToPixel(p.spanA))
+        ctx.lineTo(x2, yAxis.convertToPixel(c.spanA))
+        ctx.lineTo(x2, yAxis.convertToPixel(c.spanB))
+        ctx.lineTo(x1, yAxis.convertToPixel(p.spanB))
+        ctx.closePath()
+        ctx.fill()
+      }
+      ctx.restore()
+      return false
+    },
     calc: (l, ind) => {
       const [a, b, c] = ind.calcParams as number[]
       const mid = (i: number, n: number) => (i + 1 < n ? undefined : (highest(l, i, n) + lowest(l, i, n)) / 2)
@@ -206,12 +234,12 @@ export function registerCustomIndicators() {
   })
 
   registerIndicator<Row>({
-    name: 'PIVOT', shortName: 'Pivot', calcParams: [],
+    name: 'PIVOT', shortName: 'Pivot', calcParams: [0],
     figures: ['p', 'r1', 'r2', 'r3', 's1', 's2', 's3'].map((k) => ({ key: k, title: `${k.toUpperCase()}: `, type: 'circle' })),
     styles: { circles: ['#f0b90b', '#ef5350', '#ef5350', '#ef5350', '#26a69a', '#26a69a', '#26a69a'].map((c) => ({ style: 'fill', upColor: c, downColor: c, noChangeColor: c })) } as never,
     // Standart (floor) pivot: bir önceki dönemin yüksek/düşük/kapanışından
-    calc: (l) => {
-      const key = periodKey(step(l))
+    calc: (l, ind) => {
+      const key = periodKey(PIVOT_KEYS[ind.calcParams[0] as number] ?? step(l))
       let cur = ''
       let prev: [number, number, number] | undefined
       let acc: [number, number, number] | undefined
@@ -228,12 +256,13 @@ export function registerCustomIndicators() {
   })
 
   registerIndicator<Row>({
-    name: 'VPVR', shortName: 'Hacim Profili', calcParams: [24], figures: [],
+    name: 'VPVR', shortName: 'Hacim Profili', calcParams: [24, 0], figures: [],
     calc: (l) => l.map(() => ({})),
     // Ekranda görünen mumların hacmini fiyat dilimlerine dağıtıp sağ kenardan yatay çubuklar çizer
     draw: ({ ctx, kLineDataList, indicator, visibleRange, bounding, yAxis }) => {
       const rows = Math.max(4, (indicator.calcParams[0] as number) || 24)
-      const list = kLineDataList.slice(visibleRange.from, visibleRange.to)
+      const fixed = (indicator.calcParams[1] as number) || 0
+      const list = fixed > 0 ? kLineDataList.slice(-fixed) : kLineDataList.slice(visibleRange.from, visibleRange.to)
       if (!list.length) return true
       const hi = Math.max(...list.map((k) => k.high))
       const lo = Math.min(...list.map((k) => k.low))

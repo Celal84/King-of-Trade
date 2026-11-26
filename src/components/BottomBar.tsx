@@ -1,4 +1,4 @@
-import { Camera, ChevronsRight, FoldVertical, Maximize, RotateCcw, UnfoldVertical, ZoomIn, ZoomOut } from 'lucide-react'
+import { Camera, StickyNote, ChevronsRight, FoldVertical, Maximize, RotateCcw, UnfoldVertical, ZoomIn, ZoomOut } from 'lucide-react'
 import { useApp } from '../store/app'
 import { paneApis } from '../lib/chartRegistry'
 import type { Timeframe } from '../types'
@@ -11,7 +11,11 @@ const RANGES: [string, Timeframe, () => number][] = [
 ]
 
 export default function BottomBar() {
-  const { active, logScale, set } = useApp()
+  const { active, logScale, panes, notes, setNote, set } = useApp()
+  const editNote = () => {
+    const text = window.prompt(`${panes[active]} için not (boş bırakırsanız silinir):`, notes[panes[active]] ?? '')
+    if (text !== null) setNote(panes[active], text.trim())
+  }
   const api = () => paneApis.get(active)
   const icon = (title: string, I: typeof ZoomIn, fn: () => void) => (
     <button className="btn px-1.5" title={title} aria-label={title} onClick={fn}><I size={15} /></button>
@@ -32,6 +36,7 @@ export default function BottomBar() {
         <button className={`btn px-1.5 ${logScale ? 'btn-on' : ''}`} title="Logaritmik ölçek" onClick={() => set({ logScale: !logScale })}>Log</button>
         {icon('Son muma git', ChevronsRight, () => api()?.toLatest())}
         {icon('Görünümü sıfırla', RotateCcw, () => api()?.reset())}
+        {icon('Sembol notu', StickyNote, editNote)}
         {icon('Grafiği resim olarak kaydet', Camera, () => api()?.screenshot())}
         {icon('Tam ekran', Maximize, () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.()))}
       </div>

@@ -20,7 +20,10 @@ export const DARK: DeepPartial<Styles> = {
     priceMark: { last: { upColor: UP, downColor: DOWN } },
     tooltip: { text: { color: TXT } },
   },
-  indicator: { tooltip: { text: { color: TXT } } },
+  indicator: { tooltip: { text: { color: TXT }, icons: [['settings', '⚙'], ['visible', '◐'], ['close', '✕']].map(([id, icon]) => ({
+    id, icon, position: 'middle', fontFamily: 'sans-serif', size: 13, color: MUTE, activeColor: '#ffffff', backgroundColor: 'transparent', activeBackgroundColor: 'rgba(41,98,255,0.35)',
+    paddingLeft: 3, paddingTop: 1, paddingRight: 3, paddingBottom: 1, marginLeft: 6, marginTop: 6, marginRight: 0, marginBottom: 0,
+  })) as never } },
   xAxis: axis,
   yAxis: axis,
   separator: { color: LINE },
@@ -87,6 +90,43 @@ const SHAPES: OverlayTemplate[] = [
     },
   },
 ]
+
+const FIB_EXT = [0, 0.618, 1, 1.272, 1.618, 2.618]
+const GANN = [1 / 8, 1 / 4, 1 / 3, 1 / 2, 1, 2, 3, 4, 8]
+SHAPES.push(
+  {
+    // A→B hareketi, C noktasından ileriye yansıtılır
+    name: 'kotFibExt', totalStep: 4, ...shape,
+    createPointFigures: ({ overlay, coordinates, precision }) => {
+      const [a, b, c] = coordinates
+      if (!b) return []
+      if (!c) return { type: 'line', attrs: { coordinates: [a, b] } }
+      const [pa, pb, pc] = overlay.points.map((p) => p.value ?? 0)
+      return [
+        { type: 'line', attrs: { coordinates: [a, b, c] }, styles: { style: 'dashed' } },
+        ...FIB_EXT.flatMap((r) => {
+          const y = c.y + (b.y - a.y) * r
+          return [
+            { type: 'line', attrs: { coordinates: [{ x: c.x, y }, { x: c.x + 320, y }] } },
+            { type: 'text', ignoreEvent: true, attrs: { x: c.x + 324, y, text: `${r} (${(pc + (pb - pa) * r).toFixed(precision.price)})`, baseline: 'middle' }, styles: { color: TXT, size: 11, backgroundColor: 'transparent', borderSize: 0 } },
+          ]
+        }),
+      ]
+    },
+  },
+  {
+    name: 'kotGann', totalStep: 3, ...shape,
+    createPointFigures: ({ coordinates: [a, b] }) =>
+      b ? GANN.map((r) => ({ type: 'line', attrs: { coordinates: [a, { x: a.x + (b.x - a.x) * 4, y: a.y + (b.y - a.y) * r * 4 }] }, styles: r === 1 ? { size: 2 } : {} })) : [],
+  },
+  {
+    name: 'kotWave', totalStep: 7, ...shape,
+    createPointFigures: ({ coordinates }) => [
+      { type: 'line', attrs: { coordinates } },
+      ...coordinates.map((p, n) => ({ type: 'text', ignoreEvent: true, attrs: { x: p.x, y: p.y - 6, text: String(n), align: 'center', baseline: 'bottom' }, styles: { color: TXT, size: 12, backgroundColor: 'transparent', borderSize: 0 } })),
+    ],
+  },
+)
 
 let done = false
 
