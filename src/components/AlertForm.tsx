@@ -55,7 +55,7 @@ export default function AlertForm({ symbol: first, initial, onDone }: { symbol: 
   const numInput = (value: number | undefined, on: (v: number) => void, cls = '') => (
     <input className={`inp ${cls}`} inputMode="decimal" defaultValue={value} key={String(value)} onBlur={(e) => on(num(e.target.value))} />
   )
-  if (picking) return <SymbolSearch onPick={setSymbol} onClose={() => setPicking(false)} />
+  if (picking) return <SymbolSearch onPick={(s) => (setSymbol(s), setPicking(false))} onClose={() => setPicking(false)} />
   return (
     <div className="space-y-3 text-xs">
       <button className="btn border border-line w-full justify-start" onClick={() => setPicking(true)}>

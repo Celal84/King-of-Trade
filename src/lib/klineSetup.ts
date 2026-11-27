@@ -195,6 +195,21 @@ export function setupKline() {
     }),
   })
 
+  // Portföydeki pozisyonun maliyet çizgisi: grafiği boydan boya geçer, solunda maliyet/miktar/kâr-zarar etiketi
+  registerOverlay({
+    name: 'kotCost',
+    totalStep: 2,
+    needDefaultYAxisFigure: true,
+    createPointFigures: ({ overlay, coordinates, bounding }) => {
+      const { text, color } = overlay.extendData as { text: string; color: string }
+      const y = coordinates[0].y
+      return [
+        { type: 'line', ignoreEvent: true, attrs: { coordinates: [{ x: 0, y }, { x: bounding.width, y }] }, styles: { style: 'dashed', dashedValue: [6, 4], color, size: 1 } },
+        { type: 'text', ignoreEvent: true, attrs: { x: 6, y: y - 3, text, align: 'left', baseline: 'bottom' }, styles: { color: '#fff', size: 11, backgroundColor: color, borderSize: 0, paddingLeft: 5, paddingRight: 5, paddingTop: 2, paddingBottom: 2, borderRadius: 3 } },
+      ]
+    },
+  })
+
   registerOverlay({
     name: 'kotEmoji',
     totalStep: 2,

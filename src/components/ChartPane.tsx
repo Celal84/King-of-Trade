@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ActionType, CandleType, DomPosition, OverlayMode, TooltipShowRule, YAxisType, dispose, init, registerIndicator, utils, type Chart, type OverlayCreate } from 'klinecharts'
 import type { Candle, CandleKind, Timeframe } from '../types'
 import { MarketRouter } from '../adapters/MarketRouter'
@@ -11,6 +11,7 @@ import { loadDrawings, saveDrawings, type SavedDrawing } from '../lib/drawings'
 import { displayName, getSymbol } from '../data/symbols'
 import { usePine } from '../store/pine'
 import { MOBILE } from '../hooks/useIsMobile'
+import { positionsOf, usePortfolio } from '../store/portfolio'
 import { LINE_PALETTE } from '../lib/indicators'
 import { PINE_PREFIX, runPine, type PineResult } from '../lib/pine'
 
@@ -96,6 +97,8 @@ export default function ChartPane({ index }: { index: number }) {
   const note = useApp((s) => s.notes[symbol])
   const pineScripts = usePine((s) => s.scripts)
   const pineDraft = usePine((s) => s.draft)
+  const txs = usePortfolio((s) => s.txs)
+  const position = useMemo(() => positionsOf(txs.filter((t) => t.symbol === symbol)).find((p) => p.qty > 0), [txs, symbol])
   const shownCcy = MarketRouter.currencyOf(symbol, ccy)
   const converted = shownCcy !== getSymbol(symbol).currency
   symRef.current = converted ? `${symbol}:${shownCcy}` : symbol
@@ -406,6 +409,26 @@ export default function ChartPane({ index }: { index: number }) {
     syncIndicators()
     indis.current.forEach((pane, name) => chart.current?.overrideIndicator({ name, ...configOf(name) }, pane))
   }, [indicatorConfig, tf])
+
+  // Portföyde bu sembolden pozisyon varsa maliyet çizgisi gösterilir ve fiyat değiştikçe kâr/zarar güncellenir
+  useEffect(() => {
+    const c = chart.current
+    const id = `kot-pos-${index}`
+    const last = raw.current.at(-1)
+    if (!c || status !== 'ok' || !position || converted || !last) return void c?.removeOverlay(id)
+    const price = quote?.price ?? last.close
+    const pnl = (price - position.avg) * position.qty
+    const sign = pnl >= 0 ? '+' : ''
+    const data = {
+      points: [{ timestamp: last.timestamp, value: position.avg }],
+      extendData: {
+        color: pnl >= 0 ? look.up : look.down,
+        text: `Maliyet ${fmt(position.avg)} · ${fmt(position.qty, position.qty % 1 ? 4 : 0)} adet · K/Z ${sign}${fmt(pnl, 2)} (${sign}${fmt((price / position.avg - 1) * 100, 2)}%)`,
+      },
+    }
+    if (c.getOverlayById(id)) c.overrideOverlay({ id, ...data })
+    else c.createOverlay({ id, name: 'kotCost', groupId: 'kot-pos', lock: true, ...data })
+  }, [position, status, quote?.price, converted, look, index])
 
   // Gün içi grafikte pivot dönemleri (ör. yıllık) için daha uzun geçmişli günlük mumlar yüklenir
   useEffect(() => {

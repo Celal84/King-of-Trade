@@ -27,6 +27,7 @@ export default function TxForm({ draft, onClose }: { draft: TxDraft; onClose: ()
   const [q, p] = [num(qty), num(price)]
   const pick = (s: string) => {
     setSymbol(s)
+    setPicking(false)
     if (!price) setPrice(String(prices[s]?.price ?? ''))
   }
   const submit = () => {

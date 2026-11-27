@@ -18,7 +18,8 @@ export default function SymbolSearch({ onClose, compareMode, addMode, onPick }: 
       .sort((a, b) => +fold(b.symbol).startsWith(t) - +fold(a.symbol).startsWith(t))
   }, [q, cat, cryptoCount])
   const pick = (s: string) => {
-    if (onPick) return (onPick(s), onClose())
+    // Seçim modunda pencereyi kapatmak çağıranın işidir
+    if (onPick) return onPick(s)
     if (compareMode) return toggleCompare(s)
     if (addMode) return toggleFavorite(s)
     setSymbol(s)
