@@ -1,16 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeftRight, BellPlus, ChevronDown, ChevronRight, ChevronUp, Flag, Info, LineChart, ListPlus, MoreVertical, Pencil, Plus, Star, Trash2, type LucideIcon } from 'lucide-react'
-import { CRYPTO_QUOTES, INDEX_LIST, INDEX_MEMBERS, SYMBOLS, displayName, getSymbol, isIndex } from '../data/symbols'
+import { INDEX_LIST, INDEX_MEMBERS, SYMBOLS, displayName, getSymbol, isIndex } from '../data/symbols'
 import { SECTION, isSection, useApp, useFavorites, useListEntries } from '../store/app'
 import SymbolSearch from './SymbolSearch'
 import SymbolDetail from './SymbolDetail'
 import Tick from './Tick'
-import { useTickers } from '../hooks/useCrypto'
 import { fmt } from '../lib/candles'
 import type { Category } from '../types'
 
-const TABS: [Category | 'FAV', string][] = [['FAV', 'Listelerim'], ['BIST', 'BIST'], ['EMTIA', 'Emtia & Döviz'], ['SENTETIK', 'Sentetik'], ['KRIPTO', 'Kripto']]
-const CRYPTO_LIMIT = 200
+const TABS: [Category | 'FAV', string][] = [['FAV', 'Listelerim'], ['BIST', 'BIST'], ['EMTIA', 'Emtia & Döviz'], ['SENTETIK', 'Sentetik']]
 const FLAGS = ['#ef5350', '#ff9800', '#26a69a', '#2962ff', '#e040fb']
 const HOLD_MS = 500
 // Dokunmatik ekranda tarayıcının sürükle-bırak hareketi basılı tutma menüsüyle çakışır; sürükleme yalnızca farede açık
@@ -19,7 +17,6 @@ const MOUSE = window.matchMedia('(hover: hover)').matches
 export default function Watchlist({ onPick }: { onPick?: () => void }) {
   const [tab, setTab] = useState<Category | 'FAV'>('FAV')
   const [group, setGroup] = useState('XU030')
-  const [quote, setQuote] = useState<string>('USDT')
   const { prices, panes, active, lists, listIdx, setSymbol, toggleFavorite, addList, renameList, removeList, addSection, renameSection, removeEntry, moveEntry, flags, setFlag, set } = useApp()
   const favorites = useFavorites()
   const entries = useListEntries()
@@ -58,20 +55,13 @@ export default function Watchlist({ onPick }: { onPick?: () => void }) {
   const item = (I: LucideIcon, label: string, fn: () => void, cls = '') => (
     <li><button className={`flex items-center gap-2 w-full px-3 py-1.5 hover:bg-line text-left ${cls}`} onClick={() => (fn(), setMenu(null))}><I size={14} /> {label}</button></li>
   )
-  const tickers = useTickers((s) => s.tickers)
-  const hasTickers = Object.keys(tickers).length > 0
   const list = useMemo(() => {
     if (tab === 'FAV') return favorites.map(getSymbol)
-    if (tab === 'KRIPTO') {
-      const t = useTickers.getState().tickers
-      const all = Object.keys(t).filter((s) => s.endsWith(quote) && t[s].volume > 0).sort((a, b) => t[b].volume - t[a].volume)
-      return all.length ? all.slice(0, CRYPTO_LIMIT).map(getSymbol) : SYMBOLS.filter((s) => s.category === 'KRIPTO')
-    }
     if (tab !== 'BIST') return SYMBOLS.filter((s) => s.category === tab)
     if (group === 'INDEX') return SYMBOLS.filter((s) => isIndex(s.symbol))
     const members = group === 'ALL' ? null : INDEX_MEMBERS[group]
     return SYMBOLS.filter((s) => s.category === 'BIST' && !isIndex(s.symbol) && (!members || members.has(s.symbol)))
-  }, [tab, favorites, group, quote, hasTickers])
+  }, [tab, favorites, group])
   useEffect(() => set({ watchSymbols: list.map((s) => s.symbol) }), [list, set])
   const ask = (title: string, initial = '') => window.prompt(title, initial)?.trim()
   /** Görüntülenecek satırlar: kendi listemde bölümler ve kapalı bölümler dikkate alınır. */
@@ -115,12 +105,6 @@ export default function Watchlist({ onPick }: { onPick?: () => void }) {
           {INDEX_LIST.map(([c, n]) => <option key={c} value={c}>{n} ({INDEX_MEMBERS[c].size})</option>)}
         </select>
       )}
-      {tab === 'KRIPTO' && (
-        <div className="flex gap-1 p-1 border-b border-line shrink-0 items-center">
-          {CRYPTO_QUOTES.map((q) => <button key={q} className={`btn h-6 ${quote === q ? 'btn-on' : ''}`} onClick={() => setQuote(q)}>{q}</button>)}
-          <span className="text-[10px] text-mute ml-auto pr-1">Binance · hacme göre</span>
-        </div>
-      )}
       <div className="flex px-2 py-1 text-[10px] text-mute border-b border-line shrink-0"><span className="flex-1">Sembol</span><span className="w-20 text-right">Son</span><span className="w-14 text-right">Değ</span><span className="w-16 text-right">Değ%</span><span className="w-4" /></div>
       <ul className="overflow-y-auto flex-1 select-none" onScroll={() => swiped && setSwiped(null)}>
         {list.length === 0 && entries.length === 0 && <li className="p-3 text-xs text-mute">Liste boş. Üstteki + ile sembol ekleyin.</li>}
@@ -147,7 +131,7 @@ export default function Watchlist({ onPick }: { onPick?: () => void }) {
             )
           }
           const s = getSymbol(entry)
-          const q = tickers[s.symbol] ?? prices[s.symbol]
+          const q = prices[s.symbol]
           const abs = q ? q.price - q.price / (1 + q.change / 100) : undefined
           const tone = (q?.change ?? 0) >= 0 ? 'text-up' : 'text-down'
           const open = swiped === s.symbol

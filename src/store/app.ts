@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { CandleKind, Ccy, Layout, Quote, Timeframe } from '../types'
+import { isKnown } from '../data/symbols'
 
 export type PanelTab = 'watch' | 'scan' | 'fund' | 'paper' | 'test'
 /** symbols: sembol kodları ve `#Bölüm adı` biçiminde bölüm başlıkları, görüntülenme sırasıyla. */
@@ -43,10 +44,10 @@ interface Settings {
   notify?: boolean
 }
 
-const PANES = ['THYAO.IS', 'BTCUSDT', 'GAUTRY', 'XU100.IS', 'USDTRY=X', 'ETHUSDT']
-const DEFAULT_LIST: WatchList = { name: 'Favoriler', symbols: ['THYAO.IS', 'XU100.IS', 'GAUTRY', 'USDTRY=X', 'BTCUSDT'] }
+const PANES = ['THYAO.IS', 'XU100.IS', 'GAUTRY', 'USDTRY=X', 'GARAN.IS', 'ASELS.IS']
+const DEFAULT_LIST: WatchList = { name: 'Favoriler', symbols: ['THYAO.IS', 'XU100.IS', 'GAUTRY', 'USDTRY=X'] }
 
-type Patch = 'layout' | 'tf' | 'ccy' | 'candleKind' | 'logScale' | 'magnet' | 'drawingsVisible' | 'tab' | 'watchSymbols' | 'snapshotAt' | 'cryptoCount' | 'listIdx' | 'drawColor' | 'drawSize' | 'editIndicator' | 'proxyDown' | 'percentScale' | 'look' | 'txForm' | 'alertSymbol'
+type Patch = 'layout' | 'tf' | 'ccy' | 'candleKind' | 'logScale' | 'magnet' | 'drawingsVisible' | 'tab' | 'watchSymbols' | 'snapshotAt' | 'listIdx' | 'drawColor' | 'drawSize' | 'editIndicator' | 'proxyDown' | 'percentScale' | 'look' | 'txForm' | 'alertSymbol'
 
 interface AppState {
   panes: string[]
@@ -74,7 +75,6 @@ interface AppState {
   prices: Record<string, Quote>
   watchSymbols: string[]
   snapshotAt: number | null
-  cryptoCount: number
   editIndicator: string | null
   proxyDown: boolean
   /** Açık portföy işlem formu (null: kapalı). */
@@ -89,6 +89,8 @@ interface AppState {
   setActive: (i: number) => void
   set: (p: Partial<Pick<AppState, Patch>>) => void
   toggleIndicator: (n: string) => void
+  /** İndikatörü listede `before` adlı indikatörün önüne taşır (alt bölmelerin sırası). */
+  moveIndicator: (n: string, before: string) => void
   setIndicatorConfig: (n: string, c: IndicatorConfig) => void
   toggleCompare: (s: string) => void
   saveTemplate: (name: string) => void
@@ -139,7 +141,6 @@ export const useApp = create<AppState>()(
       prices: {},
       watchSymbols: [],
       snapshotAt: null,
-      cryptoCount: 0,
       editIndicator: null,
       proxyDown: false,
       txForm: null,
@@ -158,6 +159,11 @@ export const useApp = create<AppState>()(
       setActive: (active) => set({ active }),
       set: (p) => set(p),
       toggleIndicator: (n) => set((st) => ({ indicators: toggle(st.indicators, n) })),
+      moveIndicator: (n, before) => set((st) => {
+        const rest = st.indicators.filter((x) => x !== n)
+        const at = rest.indexOf(before)
+        return at < 0 ? {} : { indicators: [...rest.slice(0, at), n, ...rest.slice(at)] }
+      }),
       setIndicatorConfig: (n, c) => set((st) => ({ indicatorConfig: { ...st.indicatorConfig, [n]: c } })),
       toggleCompare: (s) => set((st) => ({ compare: toggle(st.compare, s).slice(-4) })),
       saveTemplate: (name) => set((st) => ({
@@ -193,13 +199,21 @@ export const useApp = create<AppState>()(
     }),
     {
       name: 'kot:app',
-      version: 2,
+      version: 3,
       migrate: (old) => {
         const o = old as Partial<AppState> & { favorites?: string[]; look?: Partial<ChartLook> & { grid?: boolean } }
         const grid = o.look?.grid ?? true
-        return { ...o, look: { ...DEFAULT_LOOK, gridH: grid, gridV: grid, ...o.look }, listIdx: o.listIdx ?? 0, lists: o.lists ?? [{ name: 'Favoriler', symbols: o.favorites ?? DEFAULT_LIST.symbols }], panes: [...(o.panes ?? []), ...PANES].slice(0, PANES.length) } as AppState
+        // v3: kripto kaldırıldı — tanınmayan semboller listelerden, panellerden ve bayraklardan ayıklanır
+        const keep = (s: string) => isSection(s) || isKnown(s)
+        const lists = (o.lists ?? [{ name: 'Favoriler', symbols: o.favorites ?? DEFAULT_LIST.symbols }]).map((l) => ({ ...l, symbols: l.symbols.filter(keep) }))
+        const panes = (o.panes ?? []).map((p, i) => (isKnown(p) ? p : PANES[i] ?? PANES[0]))
+        return {
+          ...o, lists, look: { ...DEFAULT_LOOK, gridH: grid, gridV: grid, ...o.look }, listIdx: o.listIdx ?? 0,
+          panes: [...panes, ...PANES].slice(0, PANES.length), compare: (o.compare ?? []).filter(isKnown),
+          flags: Object.fromEntries(Object.entries(o.flags ?? {}).filter(([k]) => isKnown(k))),
+        } as AppState
       },
-      partialize: ({ prices: _p, watchSymbols: _w, snapshotAt: _s, cryptoCount: _c, editIndicator: _e, proxyDown: _d, txForm: _t, alertSymbol: _a, ...rest }) => rest,
+      partialize: ({ prices: _p, watchSymbols: _w, snapshotAt: _s, editIndicator: _e, proxyDown: _d, txForm: _t, alertSymbol: _a, ...rest }) => rest,
     },
   ),
 )

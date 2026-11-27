@@ -26,7 +26,7 @@ export const DARK: DeepPartial<Styles> = {
   })) as never } },
   xAxis: axis,
   yAxis: axis,
-  separator: { color: LINE },
+  separator: { size: 2, color: LINE, fill: true, activeBackgroundColor: 'rgba(41,98,255,0.25)' },
   crosshair: { horizontal: cross, vertical: cross },
 }
 

@@ -1,11 +1,10 @@
 import type { Candle, Ccy, Fundamentals, Quote, Source, Timeframe } from '../types'
 import { getSymbol } from '../data/symbols'
-import { BinanceAdapter } from './BinanceAdapter'
 import { YahooAdapter } from './YahooAdapter'
 import { SyntheticAdapter, combine, componentsOf, derive } from './SyntheticAdapter'
 import { marketOpen } from '../lib/market'
 
-const ADAPTERS = { binance: BinanceAdapter, yahoo: YahooAdapter, synthetic: SyntheticAdapter }
+const ADAPTERS = { yahoo: YahooAdapter, synthetic: SyntheticAdapter }
 // Açık piyasada son mum sık yoklanır ki grafik sürekli aksın; kapalıyken seyrek
 const POLL_MS = 8_000
 const IDLE_EVERY = 8
@@ -34,16 +33,14 @@ export const MarketRouter = {
 
   /** Her kaynağın fiyatları hazır oldukça `onPart` ile iletilir; yavaş bir kaynak diğerlerini bekletmez. */
   async streamQuotes(symbols: string[], onPart: (q: Record<string, Quote>) => void): Promise<void> {
-    const groups: Record<Source, string[]> = { binance: [], yahoo: [], synthetic: [] }
+    const groups: Record<Source, string[]> = { yahoo: [], synthetic: [] }
     for (const s of new Set(symbols)) groups[getSymbol(s).source].push(s)
     // Yahoo sembolleri ile sentetiklerin bileşenleri tek istekte alınır; sentetik fiyatlar bu yanıttan türetilir
     const yahoo = [...new Set([...groups.yahoo, ...componentsOf(groups.synthetic)])]
-    await Promise.all([
-      groups.binance.length ? BinanceAdapter.getQuotes(groups.binance).then(onPart, () => undefined) : undefined,
-      yahoo.length ? YahooAdapter.getQuotes(yahoo).then((q) => {
-        onPart({ ...Object.fromEntries(groups.yahoo.filter((s) => q[s]).map((s) => [s, q[s]])), ...derive(groups.synthetic, q) })
-      }, () => undefined) : undefined,
-    ])
+    if (!yahoo.length) return
+    await YahooAdapter.getQuotes(yahoo).then((q) => {
+      onPart({ ...Object.fromEntries(groups.yahoo.filter((s) => q[s]).map((s) => [s, q[s]])), ...derive(groups.synthetic, q) })
+    }, () => undefined)
   },
 
   getFundamentals: (symbol: string): Promise<Fundamentals> => YahooAdapter.getFundamentals(symbol),
@@ -51,7 +48,6 @@ export const MarketRouter = {
   /** Son mumu yoklar. Kota için: arka plandaki paneller (`slow`) ve kapalı piyasalar seyrek yoklanır; mum değişmedikçe
    *  aralık 8 → 16 → 24 → 32 saniyeye uzar, değişince 8 saniyeye döner. */
   subscribe(symbol: string, tf: Timeframe, cb: (c: Candle) => void, ccy: Ccy = 'ORG', slow: () => boolean = () => false): () => void {
-    if (getSymbol(symbol).source === 'binance' && !fxOf(symbol, ccy)) return BinanceAdapter.subscribe(symbol, tf, cb)
     let tick = 0
     let skip = 0
     let still = 0

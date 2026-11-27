@@ -12,7 +12,7 @@ export default defineConfig({
       manifest: {
         name: 'King of Trade',
         short_name: 'KingOfTrade',
-        description: 'BIST 100, Emtia, Sentetik TR ve Kripto finansal terminal',
+        description: 'BIST, Emtia, Döviz ve Sentetik TR finansal terminal',
         theme_color: '#131722',
         background_color: '#131722',
         display: 'standalone',

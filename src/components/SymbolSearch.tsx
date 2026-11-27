@@ -10,13 +10,13 @@ const LIMIT = 80
 export default function SymbolSearch({ onClose, compareMode, addMode, onPick }: { onClose: () => void; compareMode?: boolean; addMode?: boolean; onPick?: (symbol: string) => void }) {
   const [q, setQ] = useState('')
   const [cat, setCat] = useState<Category | 'ALL'>('ALL')
-  const { toggleFavorite, setSymbol, compare, toggleCompare, cryptoCount, lists, listIdx } = useApp()
+  const { toggleFavorite, setSymbol, compare, toggleCompare, lists, listIdx } = useApp()
   const favorites = useFavorites()
   const list = useMemo(() => {
     const t = fold(q.trim())
     return SYMBOLS.filter((s) => (cat === 'ALL' || s.category === cat) && (!t || fold(s.symbol).includes(t) || fold(s.name).includes(t)))
       .sort((a, b) => +fold(b.symbol).startsWith(t) - +fold(a.symbol).startsWith(t))
-  }, [q, cat, cryptoCount])
+  }, [q, cat])
   const pick = (s: string) => {
     // Seçim modunda pencereyi kapatmak çağıranın işidir
     if (onPick) return onPick(s)

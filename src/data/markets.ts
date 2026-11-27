@@ -1,4 +1,4 @@
-export type Cur = 'TRY' | 'USD' | 'USDT'
+export type Cur = 'TRY' | 'USD'
 
 export const INDICES: [string, string][] = [
   ['XU100', 'BIST 100'], ['XU050', 'BIST 50'], ['XU030', 'BIST 30'], ['XUTUM', 'BIST Tüm'], ['XYLDZ', 'BIST Yıldız'],
@@ -41,4 +41,3 @@ export const SENTETIK: [string, string, Cur][] = [
   ['XU100EUR', 'BIST 100 (EUR)', 'USD'], ['BRENTTRY', 'Brent Petrol (TL)', 'TRY'],
 ]
 
-export const KRIPTO = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'PAXGUSDT', 'BTCTRY', 'ETHTRY', 'USDTTRY']

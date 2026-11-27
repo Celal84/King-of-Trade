@@ -1,5 +1,5 @@
-// Cloudflare Worker: Yahoo proxy (/?url=), KV belge deposu (/kv/a alarmlar, /kv/u senkron) ve zamanlanmış alarm kontrolü.
-import { ALARM_TTL, CRYPTO, alarmMeta, diag, runAlarms } from './alarms.js'
+// Cloudflare Worker: Yahoo proxy (/?url=), mali tablolar (/fin), KAP (/kap), KV belge deposu (/kv/a alarmlar, /kv/u senkron) ve zamanlanmış alarm kontrolü.
+import { ALARM_TTL, alarmMeta, diag, runAlarms } from './alarms.js'
 
 const ALLOWED = /^https:\/\/(query1|query2)\.finance\.yahoo\.com\//
 const CODE = /^[A-Z2-9]{20}$/
@@ -41,24 +41,6 @@ async function disclosures(q) {
     body: JSON.stringify({ fromDate: day(Date.now() - days * 86400_000), toDate: day(Date.now()), mkkMemberOidList: [oid], subjectList: [] }),
   })
   return pass(r, 300)
-}
-
-let cryptoSource = 0
-
-// Binance'e doğrudan ulaşamayan istemciler için: /crypto?path=/klines?... — sırayla Binance ve MEXC denenir.
-// x-kot-pct: değişim yüzdesi alanının çarpanı (MEXC oran döndürür).
-async function cryptoProxy(path) {
-  if (!/^\/(klines\?|ticker\/24hr(\?|$))/.test(path ?? '')) return new Response('Invalid path', { status: 400, headers: CORS })
-  for (let n = 0; n < CRYPTO.length; n++) {
-    const i = (cryptoSource + n) % CRYPTO.length
-    const c = CRYPTO[i]
-    const url = c.base + path.replace(/interval=([^&]+)/, (_, t) => `interval=${c.tf(t)}`)
-    const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' } }).catch(() => null)
-    if (!r?.ok) continue
-    cryptoSource = i
-    return new Response(r.body, { headers: { ...CORS, 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=5', 'Access-Control-Expose-Headers': 'x-kot-pct', 'x-kot-pct': String(c.pct) } })
-  }
-  return new Response('Upstream error', { status: 502, headers: CORS })
 }
 
 const json = (body, status = 200) => new Response(body, { status, headers: { ...CORS, 'Content-Type': 'application/json' } })
@@ -104,7 +86,6 @@ export default {
     const url = new URL(request.url)
     if (url.pathname === '/fin') return financials(url.searchParams)
     if (url.pathname === '/kap') return disclosures(url.searchParams)
-    if (url.pathname === '/crypto') return cryptoProxy(url.searchParams.get('path'))
     if (url.pathname === '/diag') return json(JSON.stringify(await diag(env)))
     const kv = url.pathname.match(/^\/kv\/([au])$/)
     return kv ? store(request, env, kv[1], url.searchParams.get('code')) : proxy(url.searchParams.get('url'))

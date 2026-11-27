@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { MarketRouter } from '../adapters/MarketRouter'
 import { useApp } from '../store/app'
-import { useTickers } from '../hooks/useCrypto'
 import { displayName, getSymbol, indicesOf } from '../data/symbols'
 import { fmt, fmtBig } from '../lib/candles'
 import type { Fundamentals } from '../types'
@@ -21,7 +20,6 @@ export default function SymbolDetail({ symbol, onClose }: { symbol: string; onCl
   const quote = useApp((s) => s.prices[symbol])
   const note = useApp((s) => s.notes[symbol])
   const set = useApp((s) => s.set)
-  const ticker = useTickers((s) => s.tickers[symbol])
   const [data, setData] = useState<Fundamentals | null>(null)
   useEffect(() => {
     let alive = true
@@ -31,7 +29,7 @@ export default function SymbolDetail({ symbol, onClose }: { symbol: string; onCl
       alive = false
     }
   }, [symbol, info.source])
-  const q = ticker ?? quote
+  const q = quote
   const abs = q ? q.price - q.price / (1 + q.change / 100) : undefined
   const tone = (q?.change ?? 0) >= 0 ? 'text-up' : 'text-down'
   const range = data?.high52 && data.low52 && q ? ((q.price - data.low52) / (data.high52 - data.low52)) * 100 : undefined
@@ -60,7 +58,6 @@ export default function SymbolDetail({ symbol, onClose }: { symbol: string; onCl
           <div className="h-1.5 bg-line rounded relative"><div className="absolute -top-1 w-1 h-3.5 bg-acc rounded" style={{ left: `${Math.min(100, Math.max(0, range))}%` }} /></div>
         </div>
       )}
-      {ticker && <div className="flex justify-between"><span className="text-mute">24 saatlik hacim</span><span className="tabular-nums">{fmtBig(ticker.volume)}</span></div>}
       {stats.length > 0 && (
         <dl className="grid grid-cols-2 gap-x-3">
           {stats.map(([label, value, cls]) => <div key={label} className="flex justify-between py-0.5 border-b border-line/60"><dt className="text-mute">{label}</dt><dd className={`tabular-nums ${cls}`}>{value}</dd></div>)}

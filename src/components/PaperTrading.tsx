@@ -32,7 +32,7 @@ export default function PaperTrading() {
       <div className="grid grid-cols-2 gap-2">
         {(['TRY', 'USDT'] as const).map((k) => (
           <div key={k} className={`rounded border p-2 ${w === k ? 'border-acc' : 'border-line'}`}>
-            <div className="text-mute">{k === 'TRY' ? 'TL Cüzdan' : 'USDT Cüzdan'}</div>
+            <div className="text-mute">{k === 'TRY' ? 'TL Cüzdan' : 'USD Cüzdan'}</div>
             <div className="font-semibold tabular-nums">{fmt(p.cash[k], 2)}</div>
           </div>
         ))}

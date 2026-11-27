@@ -1,16 +1,15 @@
 # King of Trade
 
-BIST 100, Emtia, Sentetik TR pariteleri ve canlı Kripto destekli, açık kaynak finansal terminal. GitHub Pages (Web/PWA) ve Android APK (Capacitor) olarak çalışır.
+BIST, Emtia, Döviz ve Sentetik TR pariteleri için açık kaynak finansal terminal. GitHub Pages (Web/PWA) ve Android APK (Capacitor) olarak çalışır.
 
 ## Özellikler
-- **Kapsam:** tüm BIST hisseleri (600+), 34 endeks grubu (BIST 30/50/100, Banka, Sınai, Katılım…), emtia, döviz, küresel endeksler, sentetik TR pariteleri, kripto.
-- **Veri:** Binance REST + WebSocket (kripto, canlı), Yahoo Finance (mum verisi), toplu tarama kaynağından BIST fiyat/temel/performans verisi.
+- **Kapsam:** tüm BIST hisseleri (600+), 34 endeks grubu (BIST 30/50/100, Banka, Sınai, Katılım…), emtia, döviz, küresel endeksler, sentetik TR pariteleri.
+- **Veri:** Yahoo Finance (mum verisi), toplu tarama kaynağından BIST fiyat/temel/performans verisi.
 - **Para birimi:** her grafik TL, USD veya EUR bazında görüntülenebilir (zaman hizalamalı kur dönüşümü).
 - **Grafik:** `klinecharts` — 1m…1w, Mum / Hollow / Heikin Ashi / Çizgi / Alan, logaritmik ölçek, tüm yerleşik indikatörler + ATR, 1x1 / 1x2 / 2x2 düzen; hazır aralıklar (1G…Tümü), yakınlaştırma ve fiyat ölçeği kontrolleri.
 - **Çizim:** çizgiler (trend, ışın, uzatılmış, ok, yatay/dikey), kanallar ve Fibonacci, şekiller (dikdörtgen, daire, üçgen), fiyat ölçer, al/sat pozisyonu (R/R), metin/not/etiket; mıknatıs, gizle/göster, geri al, temizle; sembol bazlı kalıcı.
 - **Paneller:** İzleme listesi (endeks grubu filtresi), BIST Tarama (performans, hacim, F/K, RSI… sıralama ve hazır taramalar), Temel analiz (değerleme, kârlılık, performans, endeks üyelikleri), çift cüzdanlı Paper Trading.
 - **Karşılaştırma:** 4 sembole kadar yüzde ölçeğinde üst üste; **indikatör ayarları** (periyot ve renk); **çoklu izleme listesi**.
-- **Kripto:** tüm Binance spot pariteleri (USDT / TRY / USDC / FDUSD), hacme göre listeler ve kripto taraması (canlı).
 - **Zaman dilimleri:** 1m, 5m, 15m, 30m, 1h, 2h, 4h, 1d, 1w, 1M; 6 grafiğe kadar çoklu düzen; ekran görüntüsü ve tam ekran.
 - **Ek indikatörler:** Hacim Profili (görünen aralık), Pivot Noktaları Standart, Chaikin Money Flow, VWAP, SuperTrend, Ichimoku, Stokastik RSI, MFI, Donchian, Keltner, Hull MA; grafik şablonları.
 - **Grafik üzeri indikatör düğmeleri:** her indikatör satırında ayar (⚙), gizle/göster (◐) ve kaldır (✕); Ichimoku bulut dolgusu, pivot dönemi seçimi, sabit aralıklı hacim profili; Fibonacci uzatması, Gann yelpazesi, dalga çizimi; sembol notları.
@@ -25,7 +24,8 @@ BIST 100, Emtia, Sentetik TR pariteleri ve canlı Kripto destekli, açık kaynak
 - **Alarm penceresi:** kaynak (fiyat, RSI, günlük değişim, ortalama kesişimi) + işlem (kesişme, yukarı/aşağı kesişme, büyüktür, küçüktür) + değer veya EMA; "yalnızca bir kez / her seferinde", son kullanma tarihi, mesaj, bildirim kanalları.
 - **Liste hareketleri:** kompakt tek satır, basılı tutunca menü (bayrak, bölüm ekle, taşı, alarm, işlem, kaldır), sola kaydırınca hızlı düğmeler.
 - **Temel analiz:** genişletilmiş oranlar, İş Yatırım kaynaklı mali tablolar (bilanço, gelir tablosu, nakit akışı; çeyreklik/yıllık) ve KAP bildirimleri.
-- **Akış:** fiyatlar (BIST, döviz, emtia, küresel endeksler) doğrudan tarayıcıdan tek istekle alınır ve Worker kotası harcamaz: listelerim, portföy ve açık grafikler 2 saniyede bir, izlenen diğer semboller 6 saniyede bir, kapalı piyasalar dakikada bir yenilenir. Grafiğin son mumu güncel fiyatı izler; mum verisi etkin panelde 8 saniyede bir (değişim yoksa 32 saniyeye kadar seyrelerek) yoklanır. Kripto listeleri canlı akışla güncellenir.
+- **Akış:** fiyatlar (BIST, döviz, emtia, küresel endeksler) doğrudan tarayıcıdan tek istekle alınır ve Worker kotası harcamaz: listelerim, portföy ve açık grafikler 2 saniyede bir, izlenen diğer semboller 6 saniyede bir, kapalı piyasalar dakikada bir yenilenir. Grafiğin son mumu güncel fiyatı izler; mum verisi etkin panelde 8 saniyede bir (değişim yoksa 32 saniyeye kadar seyrelerek) yoklanır.
+- **Bölmeler ve dokunma:** ana grafik ile indikatör bölmeleri arasındaki tutamaç sürüklenerek yükseklik ayarlanır; her bölmede yukarı taşı, kaldır, daralt ve büyüt düğmeleri; iki parmakla yakınlaştırma/uzaklaştırma.
 - **Sunucu taraflı alarmlar:** fiyat, RSI, günlük % değişim, EMA üstü/altı, EMA/SMA kesişimi, yatay çizgiye dokunma; VE/VEYA ile çoklu koşul. Alarmlar Cloudflare Worker'da saklanır, uygulama kapalıyken de Telegram'a gönderilir.
 - **Çok koşullu tarama:** alan + operatör + değer satırları (ör. F/K < 10, RSI < 30), isimle kaydedilen filtreler.
 - **Bulut senkronu:** listeler, çizimler, şablonlar, tarama filtreleri, Pine scriptleri ve sanal portföy "senkron kodu" ile yedeklenir ve başka cihazda geri yüklenir.
@@ -47,7 +47,7 @@ Tarayıcıda Yahoo Finance CORS engeli vardır. Uygulama sırayla şu kaynaklar�
 
 Gerekli repo secret'ları: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` ("Edit Cloudflare Workers" şablonu). Ücretsiz plan sınırlarına göre tasarlanmıştır: alarmlar toplu istekle kontrol edilir, KV'ye yalnızca alarm tetiklenince veya kullanıcı değişiklik yapınca yazılır.
 
-Yahoo'nun BIST verisi kaynağında da yaklaşık 15 dakika gecikmelidir. Kripto verisi Binance'ten canlı gelir.
+Yahoo'nun BIST verisi kaynağında da yaklaşık 15 dakika gecikmelidir.
 
 ## Dağıtım
 - **Web:** `main` dalına push → `.github/workflows/deploy-web.yml` → GitHub Pages. (Repo Ayarları → Pages → Source: *GitHub Actions*.)
