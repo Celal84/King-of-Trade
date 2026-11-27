@@ -106,7 +106,7 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           )}
           {tab === 'data' && (
             <div className="space-y-3">
-              {field('Veri Proxy URL (isteğe bağlı)', 'proxyUrl', 'https://king-of-trade.<hesap>.workers.dev')}
+              {field('Veri Proxy URL (isteğe bağlı)', 'proxyUrl', 'Boş: varsayılan sunucu kullanılır')}
               <p className="text-mute">Boş bırakılırsa uygulamayla gelen Cloudflare Worker kullanılır; o da yanıt vermezse genel CORS proxy’leri ve anlık görüntü yedek olarak devreye girer.</p>
               <hr className="border-line" />
               <CloudSyncSection />

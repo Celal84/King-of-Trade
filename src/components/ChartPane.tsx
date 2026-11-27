@@ -74,6 +74,8 @@ export default function ChartPane({ index }: { index: number }) {
   const [brush, setBrush] = useState(false)
   const [status, setStatus] = useState<'loading' | 'ok' | 'error'>('loading')
   const [lastClose, setLastClose] = useState<number>()
+  const [failure, setFailure] = useState('')
+  const [attempt, setAttempt] = useState(0)
   const [axis, setAxis] = useState({ width: 0, height: 0 })
   const dragY = useRef<number | null>(null)
   const symbol = useApp((s) => s.panes[index])
@@ -313,12 +315,19 @@ export default function ChartPane({ index }: { index: number }) {
           c.updateData(view(raw.current).at(-1)!)
         }, ccy)
       })
-      .catch(() => alive && setStatus('error'))
+      .catch((e: unknown) => {
+        if (!alive) return
+        // Önceki sembolün mumları ekranda kalmasın
+        raw.current = []
+        c.applyNewData([])
+        setFailure(e instanceof Error ? e.message : String(e))
+        setStatus('error')
+      })
     return () => {
       alive = false
       unsub()
     }
-  }, [symbol, tf, ccy, index])
+  }, [symbol, tf, ccy, index, attempt])
 
   useEffect(() => {
     chart.current?.setStyles({ candle: CANDLE_STYLE[kind] })
@@ -551,9 +560,12 @@ export default function ChartPane({ index }: { index: number }) {
           onDoubleClick={autoPrice}
         />
       </div>
-      {status !== 'ok' && (
-        <div className="absolute inset-0 top-6 flex items-center justify-center text-mute text-sm pointer-events-none">
-          {status === 'loading' ? 'Yükleniyor…' : 'Veri alınamadı. Ayarlar’dan Proxy URL girmeyi deneyin.'}
+      {status === 'loading' && <div className="absolute inset-0 top-6 flex items-center justify-center text-mute text-sm pointer-events-none">Yükleniyor…</div>}
+      {status === 'error' && (
+        <div className="absolute inset-0 top-6 z-20 flex flex-col items-center justify-center gap-2 text-sm text-center px-4">
+          <span className="text-mute">Veri alınamadı. İnternet bağlantınızı kontrol edip yeniden deneyin.</span>
+          <button className="btn border border-line" onClick={(e) => (e.stopPropagation(), setAttempt((n) => n + 1))}>Yeniden dene</button>
+          {failure && <span className="text-[10px] text-mute">Ayrıntı: {failure.slice(0, 80)}</span>}
         </div>
       )}
     </div>

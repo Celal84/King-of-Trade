@@ -4,10 +4,10 @@ import { evalAlert, needsSeries } from '../src/lib/alertEval.ts'
 const SPARK = 'https://query1.finance.yahoo.com/v7/finance/spark'
 // Binance, Cloudflare'in bazı bölgelerinden gelen istekleri reddeder (403/451). Sırayla denenir, çalışan kaynak hatırlanır.
 // MEXC aynı API biçimini ve aynı USDT paritelerini sunar; yalnızca saatlik aralık adı ve değişim birimi farklıdır.
-const CRYPTO = [
+export const CRYPTO = [
   { base: 'https://data-api.binance.vision/api/v3', tf: (t) => t, pct: 1 },
   { base: 'https://api.binance.com/api/v3', tf: (t) => t, pct: 1 },
-  { base: 'https://api.mexc.com/api/v3', tf: (t) => (t === '1h' ? '60m' : t), pct: 100 },
+  { base: 'https://api.mexc.com/api/v3', tf: (t) => ({ '1h': '60m', '1w': '1W' })[t] ?? t, pct: 100 },
   { base: 'https://api.binance.us/api/v3', tf: (t) => t, pct: 1 },
 ]
 let source = 0
