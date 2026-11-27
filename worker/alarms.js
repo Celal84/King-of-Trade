@@ -2,16 +2,6 @@
 import { applyStep, evalAlert, needsSeries, nextStep } from '../src/lib/alertEval.ts'
 
 const SPARK = 'https://query1.finance.yahoo.com/v7/finance/spark'
-// Binance, Cloudflare'in bazı bölgelerinden gelen istekleri reddeder (403/451). Sırayla denenir, çalışan kaynak hatırlanır.
-// MEXC aynı API biçimini ve aynı USDT paritelerini sunar; yalnızca saatlik aralık adı ve değişim birimi farklıdır.
-export const CRYPTO = [
-  { base: 'https://data-api.binance.vision/api/v3', tf: (t) => t, pct: 1 },
-  { base: 'https://api.binance.com/api/v3', tf: (t) => t, pct: 1 },
-  { base: 'https://api.mexc.com/api/v3', tf: (t) => ({ '1h': '60m', '1w': '1W' })[t] ?? t, pct: 100 },
-  { base: 'https://api.binance.us/api/v3', tf: (t) => t, pct: 1 },
-]
-let source = 0
-
 const RANGE = { '5m': ['5m', '5d'], '15m': ['15m', '1mo'], '1h': ['60m', '3mo'], '1d': ['1d', '1y'] }
 // Bir çalışmada okunacak en fazla kullanıcı belgesi. Etkin alarmı olmayanlar liste meta verisinden elenir.
 const MAX_USERS = 40
@@ -25,7 +15,6 @@ function due(a, d) {
   const quarter = d.getUTCMinutes() % 15 < 5
   const weekday = d.getUTCDay() % 6 !== 0
   const h = d.getUTCHours()
-  if (a.src === 'binance') return quarter
   if (a.src !== 'yahoo') return false
   return a.symbol.endsWith('.IS') ? weekday && h >= 7 && (h < 15 || (h === 15 && d.getUTCMinutes() <= 20)) : weekday && quarter
 }
@@ -51,37 +40,10 @@ async function spark(budget, symbols, interval, range) {
   return out
 }
 
-async function crypto(budget, path) {
-  for (let n = 0; n < CRYPTO.length && budget.n > 0; n++, budget.n--) {
-    const i = (source + n) % CRYPTO.length
-    const r = await fetch(`${CRYPTO[i].base}/${path(CRYPTO[i])}`, { headers: HEADERS }).catch(() => null)
-    if (r?.ok) {
-      source = i
-      return [await r.json(), CRYPTO[i]]
-    }
-  }
-  return []
-}
-
-async function klines(budget, symbol, tf) {
-  const [rows] = await crypto(budget, (c) => `klines?symbol=${symbol}&interval=${c.tf(tf)}&limit=300`)
-  return Array.isArray(rows) ? rows.map((k) => +k[4]) : undefined
-}
-
-async function dayChange(budget, symbol) {
-  const [t, c] = await crypto(budget, () => `ticker/24hr?symbol=${symbol}`)
-  return t ? +t.priceChangePercent * c.pct : undefined
-}
-
-/** Tanılama: Worker'dan her kripto kaynağının HTTP durumu. */
+/** Tanılama: alarm belgesi sayıları. */
 export async function diag(env) {
   const { keys } = await env.KV.list({ prefix: 'a:', limit: 1000 })
-  const out = { alarmDocs: keys.length, withActive: keys.filter((k) => k.metadata?.a > 0).length, legacy: keys.filter((k) => !k.metadata).length }
-  for (const c of CRYPTO) {
-    const r = await fetch(`${c.base}/klines?symbol=BTCUSDT&interval=${c.tf('1h')}&limit=2`, { headers: HEADERS }).catch((e) => ({ status: String(e) }))
-    out[c.base] = r.status
-  }
-  return out
+  return { alarmDocs: keys.length, withActive: keys.filter((k) => k.metadata?.a > 0).length, legacy: keys.filter((k) => !k.metadata).length }
 }
 
 async function telegram(tg, text) {
@@ -120,20 +82,12 @@ export async function runAlarms(env, now) {
     const data = await spark(budget, symbols, ...RANGE[tf])
     for (const s of symbols) series[`${s}|${tf}`] = data[s]?.closes
   }
-  const changes = {}
-  for (const a of all.filter((x) => x.src === 'binance')) {
-    const id = `${a.symbol}|${a.tf}`
-    if (!(id in series)) series[id] = await klines(budget, a.symbol, a.tf)
-    const needChange = a.conds.some((c) => c.kind.startsWith('change'))
-    if (needChange && !(a.symbol in changes)) changes[a.symbol] = await dayChange(budget, a.symbol)
-  }
-
   for (const u of users) {
     let changed = false
     for (const a of u.list) {
       const closes = series[`${a.symbol}|${a.tf}`] ?? []
       const q = quotes[a.symbol]
-      const ctx = a.src === 'binance' ? { closes, price: closes[closes.length - 1], change: changes[a.symbol] } : { closes, price: q?.price, change: q?.change }
+      const ctx = { closes, price: q?.price, change: q?.change }
       const at = Date.now()
       const step = nextStep(a, evalAlert(a, ctx), at)
       if (!step) continue

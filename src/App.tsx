@@ -15,12 +15,14 @@ import SettingsModal from './components/SettingsModal'
 import { useIsLandscapePhone, useIsMobile } from './hooks/useIsMobile'
 import { usePriceFeed } from './hooks/usePriceFeed'
 import { useAlertEngine } from './hooks/useAlertEngine'
-import { useCryptoUniverse } from './hooks/useCrypto'
 import { useReplay } from './store/replay'
 import { useCloudSync } from './lib/sync'
 import { PineSettings } from './components/PineEditor'
 import { PINE_PREFIX } from './lib/pine'
 import TxForm from './components/TxForm'
+import { usePortfolio } from './store/portfolio'
+import { useAlerts } from './store/alerts'
+import { isKnown } from './data/symbols'
 
 type ModalKind = 'search' | 'compare' | 'indicators' | 'alerts' | 'settings' | null
 
@@ -37,8 +39,13 @@ export default function App() {
   const close = () => setModal(null)
   usePriceFeed()
   useAlertEngine()
-  useCryptoUniverse()
   useCloudSync()
+  // Kripto kaldırıldı: eski kayıtlardaki tanınmayan semboller portföy ve alarmlardan bir kez ayıklanır
+  useEffect(() => {
+    const [pf, al] = [usePortfolio.getState(), useAlerts.getState()]
+    if (pf.txs.some((t) => !isKnown(t.symbol))) usePortfolio.setState({ txs: pf.txs.filter((t) => isKnown(t.symbol)) })
+    if (al.alerts.some((a) => !isKnown(a.symbol))) useAlerts.setState({ alerts: al.alerts.filter((a) => isKnown(a.symbol)) })
+  }, [])
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowUp, ChevronsDownUp, Maximize2, Trash2 } from 'lucide-react'
 import { ActionType, CandleType, DomPosition, OverlayMode, TooltipShowRule, YAxisType, dispose, init, registerIndicator, utils, type Chart, type OverlayCreate } from 'klinecharts'
 import type { Candle, CandleKind, Timeframe } from '../types'
 import { MarketRouter } from '../adapters/MarketRouter'
@@ -21,6 +22,8 @@ const TEXT_TOOLS = ['kotText', 'simpleAnnotation', 'simpleTag']
 const view = (l: Candle[]) => (useApp.getState().candleKind === 'heikin' ? heikinAshi(l) : l)
 const precisionOf = (p = 1) => (p < 1 ? 6 : p < 10 ? 4 : 2)
 const DEFAULT_BAR = 8
+const MIN_PANE = 30
+const PANE_HEIGHT = 90
 
 type PineRows = Map<number, Record<string, number>>
 
@@ -71,6 +74,8 @@ export default function ChartPane({ index }: { index: number }) {
   const [failure, setFailure] = useState('')
   const [attempt, setAttempt] = useState(0)
   const [axis, setAxis] = useState({ width: 0, height: 0 })
+  const [panes, setPanes] = useState<{ name: string; pane: string; top: number; height: number }[]>([])
+  const paneDrag = useRef<number | null>(null)
   const dragY = useRef<number | null>(null)
   const symbol = useApp((s) => s.panes[index])
   const tf = useApp((s) => s.tf)
@@ -137,8 +142,37 @@ export default function ChartPane({ index }: { index: number }) {
     internal()?.adjustPaneViewport(false, true, true, true)
   }
   const measure = () => {
-    const s = chart.current?.getSize('candle_pane', DomPosition.YAxis)
+    const c = chart.current
+    const s = c?.getSize('candle_pane', DomPosition.YAxis)
     if (s) setAxis((a) => (a.width === s.width && a.height === s.height ? a : { width: s.width, height: s.height }))
+    if (!c) return
+    // Alt bölmeler: sürükleme tutamaçları ve bölme düğmeleri bu konumlara yerleştirilir
+    const subs = [...indis.current, ...pinePanes.current].filter(([, pane]) => pane !== 'candle_pane').flatMap(([name, pane]) => {
+      const b = c.getSize(pane, DomPosition.Root)
+      return b ? [{ name, pane, top: b.top, height: b.height }] : []
+    }).sort((a, b) => a.top - b.top)
+    setPanes((prev) => (JSON.stringify(prev) === JSON.stringify(subs) ? prev : subs))
+  }
+  /** Bölmeyi `dy` kadar büyütür/küçültür; üstündeki de alt bölmeyse o ters yönde değişir (ana grafik kalanı alır). */
+  const resizePane = (i: number, dy: number) => {
+    const c = chart.current
+    const [cur, above] = [panes[i], panes[i - 1]]
+    if (!c || !cur) return
+    const next = Math.max(MIN_PANE, cur.height - dy)
+    if (above) c.setPaneOptions({ id: above.pane, height: Math.max(MIN_PANE, above.height + (cur.height - next)) })
+    c.setPaneOptions({ id: cur.pane, height: next })
+    measure()
+  }
+  const setPaneHeight = (pane: string, height: number) => {
+    chart.current?.setPaneOptions({ id: pane, height })
+    measure()
+  }
+  const removePane = (name: string) => {
+    if (!name.startsWith(PINE_PREFIX)) return useApp.getState().toggleIndicator(name)
+    const pine = usePine.getState()
+    const script = name.slice(PINE_PREFIX.length)
+    if (pine.draft?.name === script) pine.setDraft(null)
+    else pine.toggle(script)
   }
   const applyFit = () => {
     const c = chart.current
@@ -190,6 +224,38 @@ export default function ChartPane({ index }: { index: number }) {
         if (s) st.toggleCompare(s)
       } else st.toggleIndicator(name)
     })
+    // İki parmakla yakınlaştırma. Kütüphanenin kendi işleyicisi, ikinci parmak değmeden önce ilk parmak biraz oynarsa
+    // hareketi iptal ediyor (telefonda neredeyse her zaman). Bu yüzden iki parmak olayları yakalama aşamasında burada işlenir
+    // ve kütüphaneye iletilmez; hareket bitene kadar kalan tek parmağın kaydırma yapması da engellenir.
+    // Dinleyici, fiyat cetveli şeridini de kapsayan üst kapsayıcıya bağlanır: ikinci parmak cetvele değse de hareket algılanır
+    const host = el.current!.parentElement!
+    let pinch: { dist: number } | null = null
+    let swallow = false
+    const span = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY)
+    const onTouch = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        const d = span(e.touches)
+        if (pinch && e.type === 'touchmove' && d > 0 && pinch.dist > 0) {
+          const box = el.current!.getBoundingClientRect()
+          c.zoomAtCoordinate(d / pinch.dist, { x: (e.touches[0].clientX + e.touches[1].clientX) / 2 - box.left, y: (e.touches[0].clientY + e.touches[1].clientY) / 2 - box.top }, 0)
+        }
+        pinch = { dist: d }
+        swallow = true
+        e.preventDefault()
+        e.stopPropagation()
+        return
+      }
+      pinch = null
+      if (e.touches.length === 0) swallow = false
+      else if (swallow && e.type === 'touchmove') {
+        e.preventDefault()
+        e.stopPropagation()
+      }
+    }
+    const noGesture = (e: Event) => e.preventDefault()
+    const TOUCH = ['touchstart', 'touchmove', 'touchend', 'touchcancel'] as const
+    TOUCH.forEach((t) => host.addEventListener(t, onTouch, { capture: true, passive: false }))
+    host.addEventListener('gesturestart', noGesture)
     const ro = new ResizeObserver(() => (c.resize(), measure()))
     ro.observe(el.current!)
     paneApis.set(index, {
@@ -270,6 +336,8 @@ export default function ChartPane({ index }: { index: number }) {
     })
     return () => {
       unsubReplay()
+      TOUCH.forEach((t) => host.removeEventListener(t, onTouch, { capture: true }))
+      host.removeEventListener('gesturestart', noGesture)
       ro.disconnect()
       paneApis.delete(index)
       dispose(c)
@@ -305,9 +373,6 @@ export default function ChartPane({ index }: { index: number }) {
           raw.current = mergeCandle(raw.current, withQuote(k))
           const tip = raw.current[raw.current.length - 1]
           setLastClose(tip.close)
-          // Kriptoda fiyat mum akışından gelir; diğerlerinde fiyat beslemesi esas alınır (iki kaynak arasında gidip gelmesin)
-          const st = useApp.getState()
-          if (!converted && getSymbol(symbol).source === 'binance') st.setPrices({ [symbol]: { price: k.close, change: st.prices[symbol]?.change ?? 0 } })
           const r = useReplay.getState()
           if (r.active && r.pane === index) return
           c.updateData(view(raw.current).at(-1)!)
@@ -378,10 +443,16 @@ export default function ChartPane({ index }: { index: number }) {
         indis.current.delete(name)
       }
     })
+    // Alt bölmelerin sırası değiştiyse hepsi istenen sırayla yeniden oluşturulur
+    const isSub = (n: string) => !MAIN_PANE_INDICATORS.includes(n)
+    const [have, wanted] = [[...indis.current.keys()].filter(isSub), want.filter(isSub)]
+    if (have.length === wanted.length && have.some((n, i) => n !== wanted[i])) {
+      have.forEach((n) => (c.removeIndicator(indis.current.get(n)!, n), indis.current.delete(n)))
+    }
     want.forEach((name) => {
       if (indis.current.has(name)) return
       const main = MAIN_PANE_INDICATORS.includes(name)
-      const pane = c.createIndicator({ name, ...configOf(name) }, main, main ? { id: 'candle_pane' } : { height: 90 })
+      const pane = c.createIndicator({ name, ...configOf(name) }, main, main ? { id: 'candle_pane' } : { height: PANE_HEIGHT })
       if (pane) indis.current.set(name, pane)
     })
   }
@@ -403,6 +474,8 @@ export default function ChartPane({ index }: { index: number }) {
     prevConfig.current = indicatorConfig
     syncIndicators()
     indis.current.forEach((pane, name) => chart.current?.overrideIndicator({ name, ...configOf(name) }, pane))
+    const id = setTimeout(measure, 100)
+    return () => clearTimeout(id)
   }, [indicatorConfig, tf])
 
   // Portföyde bu sembolden pozisyon varsa maliyet çizgisi gösterilir ve fiyat değiştikçe kâr/zarar güncellenir
@@ -476,6 +549,7 @@ export default function ChartPane({ index }: { index: number }) {
         const lines = r.plots.filter((p) => p.kind === 'line').map((p) => lineStyle(p.color, p.width))
         const created = c.createIndicator({ name, extendData: pineRows(r), styles: { lines } as never }, r.overlay, r.overlay ? { id: 'candle_pane' } : { height: 100 })
         if (created) panes.set(name, created)
+        setTimeout(measure, 100)
       }).catch(() => undefined)
     })
     draw()
@@ -501,7 +575,7 @@ export default function ChartPane({ index }: { index: number }) {
   /** Açık piyasada son mumun kapanışı güncel fiyata eşitlenir: grafik, mum yoklamaları arasında da akar. */
   const withQuote = (k: Candle): Candle => {
     const q = useApp.getState().prices[symbol]
-    if (!q || converted || getSymbol(symbol).source === 'binance' || !marketOpen(symbol)) return k
+    if (!q || converted || !marketOpen(symbol)) return k
     return { ...k, close: q.price, high: Math.max(k.high, q.price), low: Math.min(k.low, q.price) }
   }
   useEffect(() => {
@@ -547,7 +621,7 @@ export default function ChartPane({ index }: { index: number }) {
   }
   const open = marketOpen(symbol)
   const info = getSymbol(symbol)
-  const delayed = snapshotAt !== null && info.source !== 'binance'
+  const delayed = snapshotAt !== null
   return (
     <div onClick={onClick} className={`relative flex flex-col min-h-0 min-w-0 bg-bg border ${isActive ? 'border-acc/60' : 'border-transparent'}`}>
       <div className="flex items-center gap-2 px-2 h-6 text-xs shrink-0">
@@ -569,6 +643,34 @@ export default function ChartPane({ index }: { index: number }) {
       </div>
       <div className="relative flex-1 min-h-0">
         <div ref={el} className="absolute inset-0" style={{ touchAction: 'none' }} />
+        {panes.map((p, i) => {
+          const max = Math.round((el.current?.clientHeight ?? 400) * 0.55)
+          const above = panes[i - 1]
+          return (
+            <div key={p.pane}>
+              <div className="absolute left-0 z-30 h-4 -mt-2 cursor-row-resize group/sep" style={{ top: p.top, right: axis.width, touchAction: 'none' }} title="Sürükle: bölme yüksekliği"
+                onPointerDown={(e) => (e.currentTarget.setPointerCapture(e.pointerId), (paneDrag.current = e.clientY))}
+                onPointerMove={(e) => {
+                  if (paneDrag.current === null) return
+                  resizePane(i, e.clientY - paneDrag.current)
+                  paneDrag.current = e.clientY
+                }}
+                onPointerUp={() => (paneDrag.current = null)} onPointerCancel={() => (paneDrag.current = null)}>
+                <div className="mx-auto mt-[7px] w-10 h-[3px] rounded bg-mute/50 group-hover/sep:bg-acc" />
+              </div>
+              <div className="absolute z-30 flex gap-0.5" style={{ top: p.top + 3, right: axis.width + 4 }}>
+                {above && !p.name.startsWith(PINE_PREFIX) && !above.name.startsWith(PINE_PREFIX) && (
+                  <button className="pane-btn" aria-label="Bölmeyi yukarı taşı" title="Yukarı taşı" onClick={() => useApp.getState().moveIndicator(p.name, above.name)}><ArrowUp size={12} /></button>
+                )}
+                <button className="pane-btn" aria-label="Bölmeyi kaldır" title="Kaldır" onClick={() => removePane(p.name)}><Trash2 size={12} /></button>
+                <button className="pane-btn" aria-label={p.height <= MIN_PANE + 2 ? 'Bölmeyi aç' : 'Bölmeyi daralt'} title={p.height <= MIN_PANE + 2 ? 'Aç' : 'Daralt'}
+                  onClick={() => setPaneHeight(p.pane, p.height <= MIN_PANE + 2 ? PANE_HEIGHT : MIN_PANE)}><ChevronsDownUp size={12} /></button>
+                <button className="pane-btn" aria-label={p.height >= max - 2 ? 'Bölmeyi küçült' : 'Bölmeyi büyüt'} title={p.height >= max - 2 ? 'Küçült' : 'Büyüt'}
+                  onClick={() => setPaneHeight(p.pane, p.height >= max - 2 ? PANE_HEIGHT : max)}><Maximize2 size={12} /></button>
+              </div>
+            </div>
+          )
+        })}
         {brush && (
           <canvas
             className="absolute inset-0 z-20 w-full h-full cursor-crosshair" style={{ touchAction: 'none' }}
@@ -583,7 +685,7 @@ export default function ChartPane({ index }: { index: number }) {
         )}
         <div
           className="absolute right-0 top-0 z-10 cursor-ns-resize" style={{ ...axis, touchAction: 'none' }} title="Sürükle: fiyat ölçeği · çift dokun: otomatik"
-          onPointerDown={(e) => (e.currentTarget.setPointerCapture(e.pointerId), (dragY.current = e.clientY))}
+          onPointerDown={(e) => e.isPrimary && (e.currentTarget.setPointerCapture(e.pointerId), (dragY.current = e.clientY))}
           onPointerMove={(e) => {
             if (dragY.current === null) return
             scalePrice(Math.exp((e.clientY - dragY.current) * 0.006))

@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import type { Quote } from '../types'
 import { getSymbol } from '../data/symbols'
 
+// 'USDT' anahtarı USD cüzdanıdır; kayıtlı hesaplarla uyum için adı korunur
 export type Wallet = 'TRY' | 'USDT'
 export type Side = 'buy' | 'sell'
 
