@@ -2,6 +2,7 @@ import type { Candle, Fundamentals, Quote, Timeframe } from '../types'
 import { aggregate, bucket, dropEmpty } from '../lib/candles'
 import { hasLiveSource, proxiedJson } from './http'
 import { Snapshot } from './snapshot'
+import { ScannerAdapter, isBist } from './ScannerAdapter'
 import { useApp } from '../store/app'
 
 const BASE = 'https://query1.finance.yahoo.com'
@@ -79,7 +80,7 @@ const Live = {
     for (let i = 0; i < symbols.length; i += 20) {
       const batch = symbols.slice(i, i + 20)
       try {
-        const j = await proxiedJson<SparkResp>(`${BASE}/v7/finance/spark?symbols=${batch.map(encodeURIComponent).join(',')}&range=1d&interval=1d`, 4_000)
+        const j = await proxiedJson<SparkResp>(`${BASE}/v7/finance/spark?symbols=${batch.map(encodeURIComponent).join(',')}&range=1d&interval=1d`, QUOTE_TTL)
         for (const r of j.spark.result ?? []) {
           const m = r.response[0]?.meta
           if (m?.regularMarketPrice == null) continue
@@ -112,6 +113,8 @@ const Live = {
   },
 }
 
+// BIST dışı Yahoo fiyatları (döviz, emtia) Worker üzerinden gelir; kota için 30 saniyede bir yenilenir
+const QUOTE_TTL = 30_000
 const BULK = 40
 const ROTATE_MAX = 200
 let cursor = 0
@@ -131,13 +134,24 @@ async function rotating(symbols: string[]): Promise<Record<string, Quote>> {
 }
 const notEmpty = (v: object) => (Array.isArray(v) ? v.length > 0 : Object.keys(v).length > 0)
 
+function viaYahoo(symbols: string[]): Promise<Record<string, Quote>> {
+  if (symbols.length <= BULK) return withFallback(() => Live.getQuotes(symbols), () => Snapshot.getQuotes(symbols), notEmpty)
+  if (!hasLiveSource() || symbols.length > ROTATE_MAX) return Snapshot.getQuotes(symbols).catch(() => Live.getQuotes(symbols))
+  return rotating(symbols)
+}
+
 export const YahooAdapter = {
   getCandles: (symbol: string, tf: Timeframe): Promise<Candle[]> =>
     withFallback(() => Live.getCandles(symbol, tf), () => Snapshot.getCandles(symbol, tf), notEmpty),
-  getQuotes: (symbols: string[]): Promise<Record<string, Quote>> => {
-    if (symbols.length <= BULK) return withFallback(() => Live.getQuotes(symbols), () => Snapshot.getQuotes(symbols), notEmpty)
-    if (!hasLiveSource() || symbols.length > ROTATE_MAX) return Snapshot.getQuotes(symbols).catch(() => Live.getQuotes(symbols))
-    return rotating(symbols)
+  /** BIST sembolleri tek istekte doğrudan tarama kaynağından; diğerleri (döviz, emtia, endeks) Yahoo'dan alınır. */
+  async getQuotes(symbols: string[]): Promise<Record<string, Quote>> {
+    const bist = symbols.filter(isBist)
+    const rest = symbols.filter((s) => !isBist(s))
+    const [a, b] = await Promise.all([
+      bist.length ? ScannerAdapter.getQuotes(bist).then((q) => (notEmpty(q) ? q : viaYahoo(bist)), () => viaYahoo(bist)) : {},
+      rest.length ? viaYahoo(rest) : {},
+    ])
+    return { ...a, ...b }
   },
   getFundamentals: (symbol: string): Promise<Fundamentals> =>
     Snapshot.getFundamentals(symbol).catch(() => Live.getFundamentals(symbol)),

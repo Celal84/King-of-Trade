@@ -9,6 +9,8 @@ const ADAPTERS = { binance: BinanceAdapter, yahoo: YahooAdapter, synthetic: Synt
 // Açık piyasada son mum sık yoklanır ki grafik sürekli aksın; kapalıyken seyrek
 const POLL_MS = 8_000
 const IDLE_EVERY = 8
+const SLOW_EVERY = 4
+const MAX_BACKOFF = 3
 type Base = 'TRY' | 'USD'
 const FX: Record<Base, Partial<Record<Ccy, [string, 'mul' | 'div']>>> = {
   TRY: { USD: ['USDTRY=X', 'div'], EUR: ['EURTRY=X', 'div'] },
@@ -41,12 +43,26 @@ export const MarketRouter = {
 
   getFundamentals: (symbol: string): Promise<Fundamentals> => YahooAdapter.getFundamentals(symbol),
 
-  subscribe(symbol: string, tf: Timeframe, cb: (c: Candle) => void, ccy: Ccy = 'ORG'): () => void {
+  /** Son mumu yoklar. Kota için: arka plandaki paneller (`slow`) ve kapalı piyasalar seyrek yoklanır; mum değişmedikçe
+   *  aralık 8 → 16 → 24 → 32 saniyeye uzar, değişince 8 saniyeye döner. */
+  subscribe(symbol: string, tf: Timeframe, cb: (c: Candle) => void, ccy: Ccy = 'ORG', slow: () => boolean = () => false): () => void {
     if (getSymbol(symbol).source === 'binance' && !fxOf(symbol, ccy)) return BinanceAdapter.subscribe(symbol, tf, cb)
     let tick = 0
+    let skip = 0
+    let still = 0
+    let last = ''
     const id = setInterval(() => {
-      if (document.hidden || (!marketOpen(symbol) && ++tick % IDLE_EVERY)) return
-      MarketRouter.getCandles(symbol, tf, ccy).then((l) => l.length && cb(l[l.length - 1])).catch(() => undefined)
+      tick++
+      if (document.hidden || (!marketOpen(symbol) && tick % IDLE_EVERY) || (slow() && tick % SLOW_EVERY) || skip-- > 0) return
+      MarketRouter.getCandles(symbol, tf, ccy).then((l) => {
+        const c = l[l.length - 1]
+        if (!c) return
+        const sig = `${c.timestamp}:${c.close}:${c.volume}`
+        still = sig === last ? Math.min(still + 1, MAX_BACKOFF) : 0
+        skip = still
+        last = sig
+        cb(c)
+      }).catch(() => undefined)
     }, POLL_MS)
     return () => clearInterval(id)
   },

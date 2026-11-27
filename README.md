@@ -25,7 +25,7 @@ BIST 100, Emtia, Sentetik TR pariteleri ve canlı Kripto destekli, açık kaynak
 - **Alarm penceresi:** kaynak (fiyat, RSI, günlük değişim, ortalama kesişimi) + işlem (kesişme, yukarı/aşağı kesişme, büyüktür, küçüktür) + değer veya EMA; "yalnızca bir kez / her seferinde", son kullanma tarihi, mesaj, bildirim kanalları.
 - **Liste hareketleri:** kompakt tek satır, basılı tutunca menü (bayrak, bölüm ekle, taşı, alarm, işlem, kaldır), sola kaydırınca hızlı düğmeler.
 - **Temel analiz:** genişletilmiş oranlar, İş Yatırım kaynaklı mali tablolar (bilanço, gelir tablosu, nakit akışı; çeyreklik/yıllık) ve KAP bildirimleri.
-- **Akış:** açık piyasada fiyatlar 5 saniyede, son mum 8 saniyede bir yenilenir; kripto listeleri canlı akışla güncellenir.
+- **Akış:** açık piyasada BIST fiyatları 5 saniyede bir doğrudan tarayıcıdan tek istekle alınır (Worker kotası harcanmaz); grafiğin son mumu güncel fiyatı izler, mum verisi etkin panelde 8 saniyede bir (değişim yoksa 32 saniyeye kadar seyrelerek) yoklanır; döviz ve emtia 30 saniyede bir; kripto listeleri canlı akışla güncellenir.
 - **Sunucu taraflı alarmlar:** fiyat, RSI, günlük % değişim, EMA üstü/altı, EMA/SMA kesişimi, yatay çizgiye dokunma; VE/VEYA ile çoklu koşul. Alarmlar Cloudflare Worker'da saklanır, uygulama kapalıyken de Telegram'a gönderilir.
 - **Çok koşullu tarama:** alan + operatör + değer satırları (ör. F/K < 10, RSI < 30), isimle kaydedilen filtreler.
 - **Bulut senkronu:** listeler, çizimler, şablonlar, tarama filtreleri, Pine scriptleri ve sanal portföy "senkron kodu" ile yedeklenir ve başka cihazda geri yüklenir.
