@@ -37,6 +37,8 @@ async function evaluate() {
 }
 
 let pushed = ''
+// Sunucuda bu cihazın alarm belgesi var mı; yoksa boş liste gönderilmez (gereksiz kayıt oluşmasın)
+let onServer = false
 const payload = () => {
   const { tgToken, tgChat } = useApp.getState().settings
   const alerts = useAlerts.getState().alerts.map((a) => ({ ...a, src: getSymbol(a.symbol).source, label: message(a) }))
@@ -46,9 +48,12 @@ const payload = () => {
 async function push() {
   const body = payload()
   if (body === pushed || !cloudReady()) return
+  const count = useAlerts.getState().alerts.length
+  if (!count && !onServer) return void useAlerts.setState({ cloud: 'ok' })
   try {
     await cloudPut('a', JSON.parse(body))
     pushed = body
+    onServer = count > 0
     useAlerts.setState({ cloud: 'ok' })
   } catch {
     useAlerts.setState({ cloud: 'err' })
@@ -60,6 +65,7 @@ async function pull() {
   if (!cloudReady()) return
   const remote = await cloudGet<Remote>('a').catch(() => undefined)
   if (remote === undefined) return void useAlerts.setState({ cloud: 'err' })
+  onServer = !!remote?.alerts?.length
   const { alerts, deleted } = useAlerts.getState()
   const server = new Map((remote?.alerts ?? []).map((a) => [a.id, a]))
   const fired: Alert[] = []
