@@ -1,8 +1,8 @@
 import type { Candle, Fundamentals, Quote, Timeframe } from '../types'
 import { aggregate, bucket, dropEmpty } from '../lib/candles'
-import { hasLiveSource, proxiedJson } from './http'
+import { cached, hasLiveSource, proxiedJson } from './http'
 import { Snapshot } from './snapshot'
-import { ScannerAdapter, isBist } from './ScannerAdapter'
+import { ScannerAdapter } from './ScannerAdapter'
 import { useApp } from '../store/app'
 
 const BASE = 'https://query1.finance.yahoo.com'
@@ -115,6 +115,7 @@ const Live = {
 
 // BIST dışı Yahoo fiyatları (döviz, emtia) Worker üzerinden gelir; kota için 30 saniyede bir yenilenir
 const QUOTE_TTL = 30_000
+const FALLBACK_TTL = 10_000
 const BULK = 40
 const ROTATE_MAX = 200
 let cursor = 0
@@ -140,16 +141,19 @@ function viaYahoo(symbols: string[]): Promise<Record<string, Quote>> {
   return rotating(symbols)
 }
 
+/** Yedek yol Worker kotasını harcar: aynı liste için en çok 10 saniyede bir çağrılır. */
+const fallback = (symbols: string[]) => cached(`yq:${[...symbols].sort().join(',')}`, FALLBACK_TTL, () => viaYahoo(symbols))
+
 export const YahooAdapter = {
   getCandles: (symbol: string, tf: Timeframe): Promise<Candle[]> =>
     withFallback(() => Live.getCandles(symbol, tf), () => Snapshot.getCandles(symbol, tf), notEmpty),
-  /** BIST sembolleri tek istekte doğrudan tarama kaynağından; diğerleri (döviz, emtia, endeks) Yahoo'dan alınır. */
+  /** Fiyatlar tek istekte doğrudan tarama kaynağından alınır; orada olmayan veya alınamayan semboller Yahoo'dan (Worker) gelir. */
   async getQuotes(symbols: string[]): Promise<Record<string, Quote>> {
-    const bist = symbols.filter(isBist)
-    const rest = symbols.filter((s) => !isBist(s))
+    const direct = symbols.filter(ScannerAdapter.supports)
+    const rest = symbols.filter((s) => !direct.includes(s))
     const [a, b] = await Promise.all([
-      bist.length ? ScannerAdapter.getQuotes(bist).then((q) => (notEmpty(q) ? q : viaYahoo(bist)), () => viaYahoo(bist)) : {},
-      rest.length ? viaYahoo(rest) : {},
+      direct.length ? ScannerAdapter.getQuotes(direct).then((q) => (notEmpty(q) ? q : fallback(direct)), () => fallback(direct)) : {},
+      rest.length ? fallback(rest) : {},
     ])
     return { ...a, ...b }
   },

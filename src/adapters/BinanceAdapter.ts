@@ -51,7 +51,8 @@ export const BinanceAdapter = {
 
   /** Tüm Binance spot pariteleri: fiyat, 24s değişim ve işlem hacmi (karşı para cinsinden). */
   allTickers: (): Promise<Record<string, Ticker>> =>
-    cached('binance:tickers', 20_000, async () => {
+    // Yedek yolda (Worker üzerinden) tüm liste büyük bir yanıttır; dakikada bir yenilenir
+    cached('binance:tickers', direct ? 20_000 : 60_000, async () => {
       const [raw, pct] = await get<{ symbol: string; lastPrice: string; priceChangePercent: string; quoteVolume: string }[]>('/ticker/24hr')
       return Object.fromEntries(raw.map((t) => [t.symbol, { price: +t.lastPrice, change: +t.priceChangePercent * pct, volume: +t.quoteVolume }]))
     }),
