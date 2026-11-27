@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware'
 import type { Alert, AlertTf, Cond, CondKind } from '../lib/alertEval'
 
 export type CloudState = 'off' | 'ok' | 'err'
-type NewAlert = Pick<Alert, 'symbol' | 'tf' | 'op' | 'conds'>
+type NewAlert = Omit<Alert, 'id' | 'active' | 'triggeredAt' | 'armed'>
 
 interface AlertState {
   alerts: Alert[]
@@ -11,7 +11,8 @@ interface AlertState {
   cloud: CloudState
   add: (a: NewAlert) => void
   remove: (id: string) => void
-  trigger: (id: string, at?: number) => void
+  /** Var olan alarmı değiştirir (düzenleme veya durum geçişi). */
+  update: (id: string, p: Partial<Alert>) => void
   rearm: (id: string) => void
 }
 
@@ -27,8 +28,8 @@ export const useAlerts = create<AlertState>()(
       cloud: 'off',
       add: (a) => set((s) => ({ alerts: [...s.alerts, { ...a, id: Math.random().toString(36).slice(2, 10), active: true }] })),
       remove: (id) => set((s) => ({ alerts: s.alerts.filter((a) => a.id !== id), deleted: [...s.deleted, id].slice(-200) })),
-      trigger: (id, at = Date.now()) => set((s) => ({ alerts: patch(s.alerts, id, { active: false, triggeredAt: at }) })),
-      rearm: (id) => set((s) => ({ alerts: patch(s.alerts, id, { active: true, triggeredAt: undefined }) })),
+      update: (id, p) => set((s) => ({ alerts: patch(s.alerts, id, p) })),
+      rearm: (id) => set((s) => ({ alerts: patch(s.alerts, id, { active: true, armed: true, triggeredAt: undefined }) })),
     }),
     {
       name: 'kot:alerts',

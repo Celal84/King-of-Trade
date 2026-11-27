@@ -31,6 +31,7 @@ export default function App() {
   const editIndicator = useApp((s) => s.editIndicator)
   const proxyDown = useApp((s) => s.proxyDown)
   const txForm = useApp((s) => s.txForm)
+  const alertSymbol = useApp((s) => s.alertSymbol)
   const [modal, setModal] = useState<ModalKind>(null)
   const [drawer, setDrawer] = useState(false)
   const close = () => setModal(null)
@@ -77,7 +78,7 @@ export default function App() {
       {editIndicator && (editIndicator.startsWith(PINE_PREFIX)
         ? <PineSettings name={editIndicator.slice(PINE_PREFIX.length)} onClose={() => useApp.getState().set({ editIndicator: null })} />
         : <IndicatorSettings name={editIndicator} onClose={() => useApp.getState().set({ editIndicator: null })} />)}
-      {modal === 'alerts' && <AlertsPanel onClose={close} />}
+      {(modal === 'alerts' || alertSymbol) && <AlertsPanel key={alertSymbol ?? 'list'} symbol={alertSymbol ?? undefined} onClose={() => (close(), useApp.getState().set({ alertSymbol: null }))} />}
       {modal === 'settings' && <SettingsModal onClose={close} />}
       {txForm && <TxForm draft={txForm} onClose={() => useApp.getState().set({ txForm: null })} />}
     </div>

@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { MarketRouter } from '../adapters/MarketRouter'
 import { useAlerts } from '../store/alerts'
 import { useApp } from '../store/app'
-import { alertText, evalAlert, needsSeries, type Alert } from '../lib/alertEval'
+import { alertText, applyStep, evalAlert, needsSeries, nextStep, type Alert } from '../lib/alertEval'
 import { cloudGet, cloudPut, cloudReady } from '../lib/cloud'
 import { fmt } from '../lib/candles'
 import { beep, browserNotify, telegram } from '../lib/notify'
@@ -10,27 +10,29 @@ import { displayName, getSymbol } from '../data/symbols'
 
 interface Remote { alerts: Alert[] }
 
-const message = (a: Alert) => `🔔 King of Trade: ${displayName(a.symbol)} · ${alertText(a)}`
+const message = (a: Alert) => `🔔 King of Trade: ${displayName(a.symbol)} · ${a.message?.trim() || alertText(a)}`
 
 function announce(a: Alert, viaTelegram: boolean) {
   const { settings, prices } = useApp.getState()
   const msg = `${message(a)} (şu an ${fmt(prices[a.symbol]?.price)})`
-  if (settings.sound !== false) beep()
-  if (settings.notify !== false) browserNotify('King of Trade Alarm', msg)
-  if (viaTelegram) telegram(settings.tgToken, settings.tgChat, msg).catch(() => undefined)
+  if (a.notify?.app !== false && settings.sound !== false) beep()
+  if (a.notify?.app !== false && settings.notify !== false) browserNotify('King of Trade Alarm', msg)
+  if (viaTelegram && a.notify?.tg !== false) telegram(settings.tgToken, settings.tgChat, msg).catch(() => undefined)
 }
 
 async function evaluate() {
-  const { alerts, trigger } = useAlerts.getState()
+  const { alerts, update } = useAlerts.getState()
   const { prices } = useApp.getState()
   for (const a of alerts.filter((x) => x.active)) {
     const q = prices[a.symbol]
     const closes = a.conds.some(needsSeries)
       ? await MarketRouter.getCandles(a.symbol, a.tf).then((l) => l.map((c) => c.close)).catch(() => [])
       : []
-    if (!evalAlert(a, { closes, price: q?.price, change: q?.change })) continue
-    trigger(a.id)
-    announce(a, true)
+    const now = Date.now()
+    const step = nextStep(a, evalAlert(a, { closes, price: q?.price, change: q?.change }), now)
+    if (!step) continue
+    update(a.id, applyStep(a, step, now))
+    if (step === 'fire') announce(a, true)
   }
 }
 
@@ -63,13 +65,13 @@ async function pull() {
   const fired: Alert[] = []
   const merged = alerts.map((a) => {
     const r = server.get(a.id)
-    if (!r || r.active || !a.active || !r.triggeredAt) return a
+    if (!r || (r.triggeredAt ?? 0) <= (a.triggeredAt ?? 0)) return a
     fired.push(a)
-    return { ...a, active: false, triggeredAt: r.triggeredAt }
+    return { ...a, active: r.active, armed: r.armed, triggeredAt: r.triggeredAt }
   })
   const known = new Set(alerts.map((a) => a.id))
   const added = [...server.values()].filter((r) => !known.has(r.id) && !deleted.includes(r.id))
-    .map(({ id, symbol, tf, op, conds, active, triggeredAt }) => ({ id, symbol, tf, op, conds, active, triggeredAt }))
+    .map(({ src: _s, label: _l, ...rest }: Alert & { src?: string; label?: string }) => rest)
   if (fired.length || added.length) useAlerts.setState({ alerts: [...merged, ...added] })
   useAlerts.setState({ cloud: 'ok' })
   fired.forEach((a) => announce(a, false))

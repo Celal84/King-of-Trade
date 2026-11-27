@@ -1,5 +1,5 @@
 // Zamanlanmış alarm kontrolü. Semboller toplu çekilir; KV'ye yalnızca alarm tetiklenince yazılır.
-import { evalAlert, needsSeries } from '../src/lib/alertEval.ts'
+import { applyStep, evalAlert, needsSeries, nextStep } from '../src/lib/alertEval.ts'
 
 const SPARK = 'https://query1.finance.yahoo.com/v7/finance/spark'
 // Binance, Cloudflare'in bazı bölgelerinden gelen istekleri reddeder (403/451). Sırayla denenir, çalışan kaynak hatırlanır.
@@ -118,17 +118,18 @@ export async function runAlarms(env, now) {
   }
 
   for (const u of users) {
-    let fired = false
+    let changed = false
     for (const a of u.list) {
       const closes = series[`${a.symbol}|${a.tf}`] ?? []
       const q = quotes[a.symbol]
       const ctx = a.src === 'binance' ? { closes, price: closes[closes.length - 1], change: changes[a.symbol] } : { closes, price: q?.price, change: q?.change }
-      if (!evalAlert(a, ctx)) continue
-      a.active = false
-      a.triggeredAt = Date.now()
-      fired = true
-      await telegram(u.doc.tg, `${a.label} (şu an ${ctx.price ?? '—'})`)
+      const at = Date.now()
+      const step = nextStep(a, evalAlert(a, ctx), at)
+      if (!step) continue
+      Object.assign(a, applyStep(a, step, at))
+      changed = true
+      if (step === 'fire' && a.notify?.tg !== false) await telegram(u.doc.tg, `${a.label} (şu an ${ctx.price ?? '—'})`)
     }
-    if (fired) await env.KV.put(u.key, JSON.stringify(u.doc), { expirationTtl: 60 * 86400 })
+    if (changed) await env.KV.put(u.key, JSON.stringify(u.doc), { expirationTtl: 60 * 86400 })
   }
 }
