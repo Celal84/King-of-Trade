@@ -13,7 +13,11 @@ export const CRYPTO = [
 let source = 0
 
 const RANGE = { '5m': ['5m', '5d'], '15m': ['15m', '1mo'], '1h': ['60m', '3mo'], '1d': ['1d', '1y'] }
-const MAX_USERS = 20
+// Bir çalışmada okunacak en fazla kullanıcı belgesi. Etkin alarmı olmayanlar liste meta verisinden elenir.
+const MAX_USERS = 40
+export const ALARM_TTL = 60 * 86400
+/** Liste sorgusunda belgeyi okumadan elemek için: etkin alarm sayısı. */
+export const alarmMeta = (doc) => ({ a: (doc?.alerts ?? []).filter((x) => x.active).length })
 const MAX_FETCH = 40
 const HEADERS = { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' }
 
@@ -70,8 +74,9 @@ async function dayChange(budget, symbol) {
 }
 
 /** Tanılama: Worker'dan her kripto kaynağının HTTP durumu. */
-export async function diag() {
-  const out = {}
+export async function diag(env) {
+  const { keys } = await env.KV.list({ prefix: 'a:', limit: 1000 })
+  const out = { alarmDocs: keys.length, withActive: keys.filter((k) => k.metadata?.a > 0).length, legacy: keys.filter((k) => !k.metadata).length }
   for (const c of CRYPTO) {
     const r = await fetch(`${c.base}/klines?symbol=BTCUSDT&interval=${c.tf('1h')}&limit=2`, { headers: HEADERS }).catch((e) => ({ status: String(e) }))
     out[c.base] = r.status
@@ -89,11 +94,17 @@ async function telegram(tg, text) {
 }
 
 export async function runAlarms(env, now) {
-  const { keys } = await env.KV.list({ prefix: 'a:', limit: MAX_USERS })
+  const { keys } = await env.KV.list({ prefix: 'a:', limit: 1000 })
   const users = []
-  for (const k of keys) {
+  // Meta verisi olmayan (eski) belgeler bir kez okunur: boşsa silinir, doluysa meta verisiyle yeniden yazılır
+  for (const k of keys.filter((x) => !x.metadata || x.metadata.a > 0).slice(0, MAX_USERS)) {
     const doc = await env.KV.get(k.name, 'json')
-    const list = (doc?.alerts ?? []).filter((a) => a.active && due(a, now))
+    if (!doc?.alerts?.length) {
+      await env.KV.delete(k.name)
+      continue
+    }
+    if (!k.metadata) await env.KV.put(k.name, JSON.stringify(doc), { expirationTtl: ALARM_TTL, metadata: alarmMeta(doc) })
+    const list = doc.alerts.filter((a) => a.active && due(a, now))
     if (list.length) users.push({ key: k.name, doc, list })
   }
   const all = users.flatMap((u) => u.list)
@@ -130,6 +141,6 @@ export async function runAlarms(env, now) {
       changed = true
       if (step === 'fire' && a.notify?.tg !== false) await telegram(u.doc.tg, `${a.label} (şu an ${ctx.price ?? '—'})`)
     }
-    if (changed) await env.KV.put(u.key, JSON.stringify(u.doc), { expirationTtl: 60 * 86400 })
+    if (changed) await env.KV.put(u.key, JSON.stringify(u.doc), { expirationTtl: ALARM_TTL, metadata: alarmMeta(u.doc) })
   }
 }

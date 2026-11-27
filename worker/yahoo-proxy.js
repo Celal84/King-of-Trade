@@ -1,11 +1,9 @@
 // Cloudflare Worker: Yahoo proxy (/?url=), KV belge deposu (/kv/a alarmlar, /kv/u senkron) ve zamanlanmış alarm kontrolü.
-import { CRYPTO, diag, runAlarms } from './alarms.js'
+import { ALARM_TTL, CRYPTO, alarmMeta, diag, runAlarms } from './alarms.js'
 
 const ALLOWED = /^https:\/\/(query1|query2)\.finance\.yahoo\.com\//
 const CODE = /^[A-Z2-9]{20}$/
 const MAX_BODY = 1_000_000
-// Alarm belgeleri uygulama her açıldığında yenilenir; 60 gün hiç açılmayan cihazın alarmları silinir.
-const ALARM_TTL = 60 * 86400
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
@@ -72,7 +70,19 @@ async function store(request, env, kind, code) {
   if (request.method !== 'PUT') return json('{"error":"yöntem"}', 405)
   const body = await request.text()
   if (body.length > MAX_BODY) return json('{"error":"boyut"}', 413)
-  await env.KV.put(key, body, kind === 'a' ? { expirationTtl: ALARM_TTL } : undefined)
+  if (kind !== 'a') await env.KV.put(key, body)
+  else {
+    // Alarm belgesi: alarm yoksa kayıt tutulmaz; varsa etkin alarm sayısı meta veriye yazılır (cron belgeyi okumadan eler).
+    // Belge uygulama her açıldığında yenilenir; 60 gün hiç açılmayan cihazın alarmları silinir.
+    let doc = null
+    try {
+      doc = JSON.parse(body)
+    } catch {
+      return json('{"error":"biçim"}', 400)
+    }
+    if (!doc?.alerts?.length) await env.KV.delete(key)
+    else await env.KV.put(key, body, { expirationTtl: ALARM_TTL, metadata: alarmMeta(doc) })
+  }
   return json('{"ok":true}')
 }
 
@@ -95,7 +105,7 @@ export default {
     if (url.pathname === '/fin') return financials(url.searchParams)
     if (url.pathname === '/kap') return disclosures(url.searchParams)
     if (url.pathname === '/crypto') return cryptoProxy(url.searchParams.get('path'))
-    if (url.pathname === '/diag') return json(JSON.stringify(await diag()))
+    if (url.pathname === '/diag') return json(JSON.stringify(await diag(env)))
     const kv = url.pathname.match(/^\/kv\/([au])$/)
     return kv ? store(request, env, kv[1], url.searchParams.get('code')) : proxy(url.searchParams.get('url'))
   },
