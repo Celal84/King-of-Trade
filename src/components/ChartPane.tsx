@@ -302,14 +302,16 @@ export default function ChartPane({ index }: { index: number }) {
         const st0 = useApp.getState()
         if (last && !converted && !st0.prices[symbol]) st0.setPrices({ [symbol]: { price: last.close, change: 0 } })
         unsub = MarketRouter.subscribe(symbol, tf, (k) => {
-          raw.current = mergeCandle(raw.current, k)
-          setLastClose(k.close)
+          raw.current = mergeCandle(raw.current, withQuote(k))
+          const tip = raw.current[raw.current.length - 1]
+          setLastClose(tip.close)
+          // Kriptoda fiyat mum akışından gelir; diğerlerinde fiyat beslemesi esas alınır (iki kaynak arasında gidip gelmesin)
           const st = useApp.getState()
-          if (!converted) st.setPrices({ [symbol]: { price: k.close, change: st.prices[symbol]?.change ?? 0 } })
+          if (!converted && getSymbol(symbol).source === 'binance') st.setPrices({ [symbol]: { price: k.close, change: st.prices[symbol]?.change ?? 0 } })
           const r = useReplay.getState()
           if (r.active && r.pane === index) return
           c.updateData(view(raw.current).at(-1)!)
-        }, ccy)
+        }, ccy, () => useApp.getState().active !== index)
       })
       .catch((e: unknown) => {
         if (!alive) return
@@ -495,6 +497,23 @@ export default function ChartPane({ index }: { index: number }) {
     const r = useReplay.getState()
     if (r.active && r.selecting && r.pane === index && hover.current !== null) r.set({ cursor: hover.current, selecting: false })
   }
+
+  /** Açık piyasada son mumun kapanışı güncel fiyata eşitlenir: grafik, mum yoklamaları arasında da akar. */
+  const withQuote = (k: Candle): Candle => {
+    const q = useApp.getState().prices[symbol]
+    if (!q || converted || getSymbol(symbol).source === 'binance' || !marketOpen(symbol)) return k
+    return { ...k, close: q.price, high: Math.max(k.high, q.price), low: Math.min(k.low, q.price) }
+  }
+  useEffect(() => {
+    const c = chart.current
+    const tip = raw.current[raw.current.length - 1]
+    if (!c || status !== 'ok' || !tip || (useReplay.getState().active && useReplay.getState().pane === index)) return
+    const next = withQuote(tip)
+    if (next.close === tip.close) return
+    raw.current = mergeCandle(raw.current, next)
+    setLastClose(next.close)
+    c.updateData(view(raw.current).at(-1)!)
+  }, [quote?.price, status])
 
   const brushEnd = () => {
     const c = chart.current

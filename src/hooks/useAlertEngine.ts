@@ -9,6 +9,7 @@ import { beep, browserNotify, telegram } from '../lib/notify'
 import { displayName, getSymbol } from '../data/symbols'
 
 interface Remote { alerts: Alert[] }
+const SERIES_EVERY = 4
 
 const message = (a: Alert) => `🔔 King of Trade: ${displayName(a.symbol)} · ${a.message?.trim() || alertText(a)}`
 
@@ -20,10 +21,13 @@ function announce(a: Alert, viaTelegram: boolean) {
   if (viaTelegram && a.notify?.tg !== false) telegram(settings.tgToken, settings.tgChat, msg).catch(() => undefined)
 }
 
+// Mum verisi gerektiren koşullar dakikada bir, yalnızca fiyat/değişim koşulları her turda değerlendirilir (Worker kotası)
+let round = 0
 async function evaluate() {
   const { alerts, update } = useAlerts.getState()
   const { prices } = useApp.getState()
-  for (const a of alerts.filter((x) => x.active)) {
+  const full = round++ % SERIES_EVERY === 0
+  for (const a of alerts.filter((x) => x.active && (full || !x.conds.some(needsSeries)))) {
     const q = prices[a.symbol]
     const closes = a.conds.some(needsSeries)
       ? await MarketRouter.getCandles(a.symbol, a.tf).then((l) => l.map((c) => c.close)).catch(() => [])
