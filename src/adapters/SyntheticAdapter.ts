@@ -21,6 +21,22 @@ export function combine(d: Op, as: Candle[], bs: Candle[]): Candle[] {
   return out
 }
 
+/** Sentetik sembollerin dayandığı Yahoo sembolleri. */
+export const componentsOf = (symbols: string[]) => [...new Set(symbols.flatMap((s) => [SYNTHETIC[s].a, SYNTHETIC[s].b]))]
+
+/** Bileşen fiyatlarından sentetik fiyatları hesaplar. */
+export function derive(symbols: string[], parts: Record<string, Quote>): Record<string, Quote> {
+  const out: Record<string, Quote> = {}
+  for (const s of symbols) {
+    const d = SYNTHETIC[s]
+    const [a, b] = [parts[d.a], parts[d.b]]
+    if (!a || !b) continue
+    const ch = d.op === 'mul' ? (1 + a.change / 100) * (1 + b.change / 100) : (1 + a.change / 100) / (1 + b.change / 100)
+    out[s] = { price: apply(d, a.price, b.price), change: (ch - 1) * 100 }
+  }
+  return out
+}
+
 export const SyntheticAdapter = {
   async getCandles(symbol: string, tf: Timeframe): Promise<Candle[]> {
     const d = SYNTHETIC[symbol]
@@ -28,17 +44,5 @@ export const SyntheticAdapter = {
     return combine(d, as, bs)
   },
 
-  async getQuotes(symbols: string[]): Promise<Record<string, Quote>> {
-    const defs = symbols.map((s) => [s, SYNTHETIC[s]] as const)
-    const parts = await YahooAdapter.getQuotes([...new Set(defs.flatMap(([, d]) => [d.a, d.b]))])
-    const out: Record<string, Quote> = {}
-    for (const [s, d] of defs) {
-      const a = parts[d.a]
-      const b = parts[d.b]
-      if (!a || !b) continue
-      const ch = d.op === 'mul' ? (1 + a.change / 100) * (1 + b.change / 100) : (1 + a.change / 100) / (1 + b.change / 100)
-      out[s] = { price: apply(d, a.price, b.price), change: (ch - 1) * 100 }
-    }
-    return out
-  },
+  getQuotes: async (symbols: string[]): Promise<Record<string, Quote>> => derive(symbols, await YahooAdapter.getQuotes(componentsOf(symbols))),
 }

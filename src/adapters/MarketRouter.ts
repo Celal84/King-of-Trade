@@ -2,7 +2,7 @@ import type { Candle, Ccy, Fundamentals, Quote, Source, Timeframe } from '../typ
 import { getSymbol } from '../data/symbols'
 import { BinanceAdapter } from './BinanceAdapter'
 import { YahooAdapter } from './YahooAdapter'
-import { SyntheticAdapter, combine } from './SyntheticAdapter'
+import { SyntheticAdapter, combine, componentsOf, derive } from './SyntheticAdapter'
 import { marketOpen } from '../lib/market'
 
 const ADAPTERS = { binance: BinanceAdapter, yahoo: YahooAdapter, synthetic: SyntheticAdapter }
@@ -36,9 +36,14 @@ export const MarketRouter = {
   async streamQuotes(symbols: string[], onPart: (q: Record<string, Quote>) => void): Promise<void> {
     const groups: Record<Source, string[]> = { binance: [], yahoo: [], synthetic: [] }
     for (const s of new Set(symbols)) groups[getSymbol(s).source].push(s)
-    await Promise.all(
-      (Object.keys(groups) as Source[]).filter((k) => groups[k].length).map((k) => ADAPTERS[k].getQuotes(groups[k]).then(onPart, () => undefined)),
-    )
+    // Yahoo sembolleri ile sentetiklerin bileşenleri tek istekte alınır; sentetik fiyatlar bu yanıttan türetilir
+    const yahoo = [...new Set([...groups.yahoo, ...componentsOf(groups.synthetic)])]
+    await Promise.all([
+      groups.binance.length ? BinanceAdapter.getQuotes(groups.binance).then(onPart, () => undefined) : undefined,
+      yahoo.length ? YahooAdapter.getQuotes(yahoo).then((q) => {
+        onPart({ ...Object.fromEntries(groups.yahoo.filter((s) => q[s]).map((s) => [s, q[s]])), ...derive(groups.synthetic, q) })
+      }, () => undefined) : undefined,
+    ])
   },
 
   getFundamentals: (symbol: string): Promise<Fundamentals> => YahooAdapter.getFundamentals(symbol),
