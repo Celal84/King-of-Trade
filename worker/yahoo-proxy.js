@@ -11,6 +11,40 @@ const CORS = {
   'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
   'Access-Control-Allow-Headers': '*',
 }
+const UA = { 'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/126 Mobile Safari/537.36', Accept: 'application/json' }
+const STOCK = /^[A-Z0-9]{3,6}$/
+const IS_YATIRIM = 'https://www.isyatirim.com.tr/_layouts/15/IsYatirim.Website/Common/Data.aspx/MaliTablo'
+const KAP = 'https://www.kap.org.tr/tr/api'
+const pass = (r, maxAge) => new Response(r.body, { status: r.status, headers: { ...CORS, 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${maxAge}` } })
+
+// Mali tablolar (İş Yatırım): /fin?code=THYAO&group=XI_29&periods=2026-9,2026-6,2026-3,2025-12
+async function financials(q) {
+  const code = q.get('code') ?? ''
+  const periods = (q.get('periods') ?? '').split(',').filter((p) => /^\d{4}-(3|6|9|12)$/.test(p)).slice(0, 4)
+  const group = q.get('group') === 'UFRS_K' ? 'UFRS_K' : 'XI_29'
+  if (!STOCK.test(code) || !periods.length) return new Response('Invalid query', { status: 400, headers: CORS })
+  const args = periods.map((p, i) => `year${i + 1}=${p.split('-')[0]}&period${i + 1}=${p.split('-')[1]}`).join('&')
+  const r = await fetch(`${IS_YATIRIM}?companyCode=${code}&exchange=TRY&financialGroup=${group}&${args}`, { headers: UA, cf: { cacheTtl: 3600, cacheEverything: true } })
+  return pass(r, 3600)
+}
+
+// KAP bildirimleri: /kap?code=THYAO&days=180 — önce şirketin üye kimliği bulunur, sonra bildirimleri sorgulanır
+async function disclosures(q) {
+  const code = q.get('code') ?? ''
+  if (!STOCK.test(code)) return new Response('Invalid query', { status: 400, headers: CORS })
+  const members = await fetch(`${KAP}/member/filter/${code}`, { headers: UA, cf: { cacheTtl: 86400, cacheEverything: true } }).then((r) => (r.ok ? r.json() : [])).catch(() => [])
+  const oid = members[0]?.mkkMemberOid
+  if (!oid) return json('[]')
+  const day = (t) => new Date(t).toISOString().slice(0, 10)
+  const days = Math.min(365, Math.max(7, +(q.get('days') ?? 180) || 180))
+  const r = await fetch(`${KAP}/disclosure/members/byCriteria`, {
+    method: 'POST',
+    headers: { ...UA, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fromDate: day(Date.now() - days * 86400_000), toDate: day(Date.now()), mkkMemberOidList: [oid], subjectList: [] }),
+  })
+  return pass(r, 300)
+}
+
 let cryptoSource = 0
 
 // Binance'e doğrudan ulaşamayan istemciler için: /crypto?path=/klines?... — sırayla Binance ve MEXC denenir.
@@ -58,6 +92,8 @@ export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') return new Response(null, { headers: CORS })
     const url = new URL(request.url)
+    if (url.pathname === '/fin') return financials(url.searchParams)
+    if (url.pathname === '/kap') return disclosures(url.searchParams)
     if (url.pathname === '/crypto') return cryptoProxy(url.searchParams.get('path'))
     if (url.pathname === '/diag') return json(JSON.stringify(await diag()))
     const kv = url.pathname.match(/^\/kv\/([au])$/)

@@ -11,6 +11,10 @@ export const STAT_COLS = [
   'close', 'change', 'volume', 'market_cap_basic', 'price_earnings_ttm', 'price_book_fq', 'dividends_yield_current', 'Perf.W', 'Perf.1M',
   'Perf.YTD', 'Perf.Y', 'RSI', 'relative_volume_10d_calc', 'earnings_per_share_basic_ttm', 'return_on_equity', 'net_income',
   'total_revenue', 'debt_to_equity', 'price_52_week_high', 'price_52_week_low',
+  'gross_margin', 'operating_margin', 'net_margin', 'return_on_assets', 'ebitda', 'free_cash_flow', 'enterprise_value_fq', 'enterprise_value_ebitda_ttm',
+  'price_sales_current', 'price_earnings_growth_ttm', 'price_free_cash_flow_ttm', 'total_assets', 'total_equity_fq', 'total_debt', 'current_ratio', 'quick_ratio',
+  'total_revenue_yoy_growth_ttm', 'earnings_per_share_diluted_yoy_growth_ttm', 'total_shares_outstanding', 'float_shares_outstanding', 'beta_1_year',
+  'Volatility.M', 'average_volume_30d_calc', 'Recommend.All',
 ]
 const TIER1 = { '1d': '10y', '60m': '6mo', '5m': '5d', '1m': '1d' }
 const TIER2 = { '1d': '5y', '60m': '3mo', '5m': '5d' }
