@@ -4,8 +4,11 @@ import { useApp } from '../store/app'
 import { usePaper } from '../store/paper'
 import { useAlerts } from '../store/alerts'
 import { usePortfolio } from '../store/portfolio'
+import { marketOpen } from '../lib/market'
 
-const INTERVAL = 20_000
+// Açık piyasadaki semboller 5 saniyede bir, kapalı olanlar dakikada bir yenilenir
+const INTERVAL = 5_000
+const IDLE_EVERY = 12
 
 function tracked(): string[] {
   const a = useApp.getState()
@@ -21,12 +24,18 @@ export function usePriceFeed() {
   const watch = useApp((s) => s.watchSymbols)
   useEffect(() => {
     let alive = true
-    const run = () =>
-      !document.hidden && MarketRouter.streamQuotes(tracked(), (q) => {
+    let tick = 0
+    const run = () => {
+      if (document.hidden) return
+      const all = tick++ % IDLE_EVERY === 0
+      const symbols = [...new Set(tracked())].filter((s) => all || marketOpen(s))
+      if (!symbols.length) return
+      MarketRouter.streamQuotes(symbols, (q) => {
         if (!alive) return
         useApp.getState().setPrices(q)
         usePaper.getState().check(useApp.getState().prices)
       })
+    }
     run()
     const id = setInterval(run, INTERVAL)
     return () => {

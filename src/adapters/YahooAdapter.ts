@@ -35,7 +35,7 @@ const chartUrl = (s: string, interval: string, range: string) =>
   `${BASE}/v8/finance/chart/${encodeURIComponent(s)}?interval=${interval}&range=${range}&includePrePost=false`
 
 async function chart(symbol: string, interval: string, range: string) {
-  const j = await proxiedJson<ChartResp>(chartUrl(symbol, interval, range))
+  const j = await proxiedJson<ChartResp>(chartUrl(symbol, interval, range), 6_000)
   const r = j.chart.result?.[0]
   if (!r) throw new Error(`${symbol}: veri yok`)
   return r
@@ -79,7 +79,7 @@ const Live = {
     for (let i = 0; i < symbols.length; i += 20) {
       const batch = symbols.slice(i, i + 20)
       try {
-        const j = await proxiedJson<SparkResp>(`${BASE}/v7/finance/spark?symbols=${batch.map(encodeURIComponent).join(',')}&range=1d&interval=1d`, 20_000)
+        const j = await proxiedJson<SparkResp>(`${BASE}/v7/finance/spark?symbols=${batch.map(encodeURIComponent).join(',')}&range=1d&interval=1d`, 4_000)
         for (const r of j.spark.result ?? []) {
           const m = r.response[0]?.meta
           if (m?.regularMarketPrice == null) continue
@@ -113,15 +113,32 @@ const Live = {
 }
 
 const BULK = 40
+const ROTATE_MAX = 200
+let cursor = 0
+let seeded = ''
+
+/** Uzun listelerde her çağrıda sıradaki 40 sembol canlı yenilenir; ilk çağrıda tüm liste anlık görüntüden doldurulur.
+ *  Böylece istek sayısı sabit kalırken listedeki fiyatlar sürekli güncellenir. */
+async function rotating(symbols: string[]): Promise<Record<string, Quote>> {
+  const window = Array.from({ length: BULK }, (_, i) => symbols[(cursor + i) % symbols.length])
+  cursor = (cursor + BULK) % symbols.length
+  const live = Live.getQuotes(window)
+  const key = `${symbols.length}:${symbols[0]}`
+  if (seeded === key) return live
+  seeded = key
+  const [snap, fresh] = await Promise.all([Snapshot.getQuotes(symbols).catch(() => ({})), live])
+  return { ...snap, ...fresh }
+}
 const notEmpty = (v: object) => (Array.isArray(v) ? v.length > 0 : Object.keys(v).length > 0)
 
 export const YahooAdapter = {
   getCandles: (symbol: string, tf: Timeframe): Promise<Candle[]> =>
     withFallback(() => Live.getCandles(symbol, tf), () => Snapshot.getCandles(symbol, tf), notEmpty),
-  getQuotes: (symbols: string[]): Promise<Record<string, Quote>> =>
-    symbols.length > BULK
-      ? Snapshot.getQuotes(symbols).catch(() => Live.getQuotes(symbols))
-      : withFallback(() => Live.getQuotes(symbols), () => Snapshot.getQuotes(symbols), notEmpty),
+  getQuotes: (symbols: string[]): Promise<Record<string, Quote>> => {
+    if (symbols.length <= BULK) return withFallback(() => Live.getQuotes(symbols), () => Snapshot.getQuotes(symbols), notEmpty)
+    if (!hasLiveSource() || symbols.length > ROTATE_MAX) return Snapshot.getQuotes(symbols).catch(() => Live.getQuotes(symbols))
+    return rotating(symbols)
+  },
   getFundamentals: (symbol: string): Promise<Fundamentals> =>
     Snapshot.getFundamentals(symbol).catch(() => Live.getFundamentals(symbol)),
 }

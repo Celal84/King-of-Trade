@@ -80,11 +80,11 @@ async function proxy(target) {
   if (!target || !ALLOWED.test(target)) return new Response('Invalid url', { status: 400, headers: CORS })
   const upstream = await fetch(target, {
     headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' },
-    cf: { cacheTtl: 30, cacheEverything: true },
+    cf: { cacheTtl: 5, cacheEverything: true },
   })
   const headers = new Headers(CORS)
   headers.set('Content-Type', upstream.headers.get('Content-Type') || 'application/json')
-  headers.set('Cache-Control', 'public, max-age=30')
+  headers.set('Cache-Control', 'public, max-age=5')
   return new Response(upstream.body, { status: upstream.status, headers })
 }
 

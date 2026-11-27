@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { BellPlus, Eye, EyeOff, LineChart, Pencil, Plus, Trash2 } from 'lucide-react'
 import PaperTrading from './PaperTrading'
+import Tick from './Tick'
 import { useApp } from '../store/app'
 import { positionsOf, usePortfolio } from '../store/portfolio'
 import { displayName, getSymbol } from '../data/symbols'
@@ -79,7 +80,7 @@ function Holdings({ onPick }: { onPick?: () => void }) {
             <div className="flex items-center gap-2 py-1.5 cursor-pointer" onClick={() => setOpen(open === r.symbol ? null : r.symbol)}>
               <div className="w-[30%] min-w-0">
                 <div className="font-semibold text-sm">{displayName(r.symbol)}</div>
-                <div className="tabular-nums">{fmt(r.price)} <span className={tone(r.change)}>{signed(r.change)}%</span></div>
+                <div className="tabular-nums"><Tick value={r.price}>{fmt(r.price)}</Tick> <span className={tone(r.change)}>{signed(r.change)}%</span></div>
               </div>
               <div className="flex-1 tabular-nums">
                 <div><b>{hide ? '••' : fmt(r.qty, r.qty % 1 ? 4 : 0)}</b> <span className="text-mute">adet</span></div>

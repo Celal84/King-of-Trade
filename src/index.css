@@ -17,3 +17,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   .tab { @apply px-3 h-9 text-xs text-mute border-b-2 border-transparent whitespace-nowrap; }
   .tab-on { @apply text-txt border-acc; }
 }
+
+/* Fiyat değişince kısa renk parlaması */
+@keyframes flash-up { from { background: rgba(38, 166, 154, 0.45); } to { background: transparent; } }
+@keyframes flash-down { from { background: rgba(239, 83, 80, 0.45); } to { background: transparent; } }
+.flash-up { animation: flash-up 0.7s ease-out; border-radius: 3px; }
+.flash-down { animation: flash-down 0.7s ease-out; border-radius: 3px; }

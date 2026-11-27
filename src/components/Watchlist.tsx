@@ -4,6 +4,7 @@ import { CRYPTO_QUOTES, INDEX_LIST, INDEX_MEMBERS, SYMBOLS, displayName, getSymb
 import { SECTION, isSection, useApp, useFavorites, useListEntries } from '../store/app'
 import SymbolSearch from './SymbolSearch'
 import SymbolDetail from './SymbolDetail'
+import Tick from './Tick'
 import { useTickers } from '../hooks/useCrypto'
 import { fmt } from '../lib/candles'
 import type { Category } from '../types'
@@ -164,7 +165,7 @@ export default function Watchlist({ onPick }: { onPick?: () => void }) {
               <div className={`group flex items-center gap-2 pl-1 pr-2 h-8 cursor-pointer transition-transform hover:bg-line/50 ${panes[active] === s.symbol ? 'bg-line/60' : ''} ${open ? '-translate-x-[132px]' : ''}`}>
                 <span className="w-1 h-4 rounded" style={{ background: flags[s.symbol] ?? 'transparent' }} />
                 <span className="flex-1 min-w-0 truncate text-xs font-semibold">{displayName(s.symbol)}</span>
-                <span className="w-20 text-right text-xs tabular-nums">{fmt(q?.price)}</span>
+                <Tick value={q?.price} className="w-20 text-right text-xs tabular-nums">{fmt(q?.price)}</Tick>
                 <span className={`w-14 text-right text-[11px] tabular-nums ${tone}`}>{abs !== undefined ? `${abs >= 0 ? '+' : ''}${fmt(abs, 2)}` : ''}</span>
                 <span className={`w-16 text-right text-xs tabular-nums ${tone}`}>{q ? `${q.change >= 0 ? '+' : ''}${fmt(q.change, 2)}%` : ''}</span>
                 <button className="w-4 text-mute [@media(hover:none)]:hidden opacity-0 group-hover:opacity-100" aria-label={`${displayName(s.symbol)} menüsü`}

@@ -11,6 +11,7 @@ import { loadDrawings, saveDrawings, type SavedDrawing } from '../lib/drawings'
 import { displayName, getSymbol } from '../data/symbols'
 import { usePine } from '../store/pine'
 import { MOBILE } from '../hooks/useIsMobile'
+import { marketOpen } from '../lib/market'
 import { positionsOf, usePortfolio } from '../store/portfolio'
 import { LINE_PALETTE } from '../lib/indicators'
 import { PINE_PREFIX, runPine, type PineResult } from '../lib/pine'
@@ -21,14 +22,6 @@ const view = (l: Candle[]) => (useApp.getState().candleKind === 'heikin' ? heiki
 const precisionOf = (p = 1) => (p < 1 ? 6 : p < 10 ? 4 : 2)
 const DEFAULT_BAR = 8
 
-/** Piyasa şu an açık mı (BIST: hafta içi 10:00–18:10 TSİ; kripto: her zaman; diğerleri: hafta içi). */
-function marketOpen(symbol: string): boolean {
-  if (getSymbol(symbol).source === 'binance') return true
-  const tr = new Date(Date.now() + 3 * 3600_000)
-  const weekday = tr.getUTCDay() % 6 !== 0
-  const minutes = tr.getUTCHours() * 60 + tr.getUTCMinutes()
-  return symbol.endsWith('.IS') ? weekday && minutes >= 600 && minutes <= 1090 : weekday
-}
 type PineRows = Map<number, Record<string, number>>
 
 function pineRows(r: PineResult): PineRows {
