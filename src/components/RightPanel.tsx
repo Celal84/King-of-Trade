@@ -2,7 +2,7 @@ import { useApp, type PanelTab } from '../store/app'
 import Watchlist from './Watchlist'
 import Screener from './Screener'
 import Fundamentals from './Fundamentals'
-import PaperTrading from './PaperTrading'
+import Portfolio from './Portfolio'
 import StrategyTester from './StrategyTester'
 
 export const PANEL_TABS: [PanelTab, string][] = [['watch', 'İzleme'], ['scan', 'Tarama'], ['fund', 'Temel'], ['paper', 'Portföy'], ['test', 'Strateji']]
@@ -18,7 +18,7 @@ export default function RightPanel({ onPick }: { onPick?: () => void }) {
         {tab === 'watch' && <Watchlist onPick={onPick} />}
         {tab === 'scan' && <Screener onPick={onPick} />}
         {tab === 'fund' && <Fundamentals />}
-        {tab === 'paper' && <PaperTrading />}
+        {tab === 'paper' && <Portfolio onPick={onPick} />}
         {tab === 'test' && <StrategyTester />}
       </div>
     </div>

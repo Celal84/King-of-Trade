@@ -29,6 +29,8 @@ export const DEFAULT_LOOK: ChartLook = {
   bg: '#131722', gridColor: '#1f2430', axisText: '#787b86',
 }
 
+export interface TxDraft { symbol?: string; side?: 'buy' | 'sell'; id?: string }
+
 interface Settings {
   proxyUrl: string
   tgToken: string
@@ -44,7 +46,7 @@ interface Settings {
 const PANES = ['THYAO.IS', 'BTCUSDT', 'GAUTRY', 'XU100.IS', 'USDTRY=X', 'ETHUSDT']
 const DEFAULT_LIST: WatchList = { name: 'Favoriler', symbols: ['THYAO.IS', 'XU100.IS', 'GAUTRY', 'USDTRY=X', 'BTCUSDT'] }
 
-type Patch = 'layout' | 'tf' | 'ccy' | 'candleKind' | 'logScale' | 'magnet' | 'drawingsVisible' | 'tab' | 'watchSymbols' | 'snapshotAt' | 'cryptoCount' | 'listIdx' | 'drawColor' | 'drawSize' | 'editIndicator' | 'proxyDown' | 'percentScale' | 'look'
+type Patch = 'layout' | 'tf' | 'ccy' | 'candleKind' | 'logScale' | 'magnet' | 'drawingsVisible' | 'tab' | 'watchSymbols' | 'snapshotAt' | 'cryptoCount' | 'listIdx' | 'drawColor' | 'drawSize' | 'editIndicator' | 'proxyDown' | 'percentScale' | 'look' | 'txForm' | 'alertSymbol'
 
 interface AppState {
   panes: string[]
@@ -75,6 +77,12 @@ interface AppState {
   cryptoCount: number
   editIndicator: string | null
   proxyDown: boolean
+  /** Açık portföy işlem formu (null: kapalı). */
+  txForm: TxDraft | null
+  /** Alarm penceresinin açılacağı sembol (null: kapalı). */
+  alertSymbol: string | null
+  flags: Record<string, string>
+  setFlag: (symbol: string, color: string | null) => void
   notes: Record<string, string>
   setNote: (symbol: string, text: string) => void
   setSymbol: (s: string) => void
@@ -89,7 +97,7 @@ interface AppState {
   saveScan: (f: ScanFilter) => void
   removeScan: (name: string) => void
   toggleFavorite: (s: string) => void
-  addSection: (name: string) => void
+  addSection: (name: string, at?: number) => void
   renameSection: (from: string, to: string) => void
   removeEntry: (index: number) => void
   moveEntry: (from: number, to: number) => void
@@ -134,6 +142,13 @@ export const useApp = create<AppState>()(
       cryptoCount: 0,
       editIndicator: null,
       proxyDown: false,
+      txForm: null,
+      alertSymbol: null,
+      flags: {},
+      setFlag: (symbol, color) => set((st) => {
+        const { [symbol]: _old, ...rest } = st.flags
+        return { flags: color ? { ...rest, [symbol]: color } : rest }
+      }),
       notes: {},
       setNote: (symbol, text) => set((st) => {
         const { [symbol]: _old, ...rest } = st.notes
@@ -156,7 +171,12 @@ export const useApp = create<AppState>()(
       saveScan: (f) => set((st) => ({ scans: [...st.scans.filter((x) => x.name !== f.name), f] })),
       removeScan: (name) => set((st) => ({ scans: st.scans.filter((x) => x.name !== name) })),
       toggleFavorite: (s) => set((st) => editList(st, (l) => ({ ...l, symbols: toggle(l.symbols, s) }))),
-      addSection: (name) => set((st) => editList(st, (l) => (l.symbols.includes(SECTION + name) ? l : { ...l, symbols: [...l.symbols, SECTION + name] }))),
+      addSection: (name, at) => set((st) => editList(st, (l) => {
+        if (l.symbols.includes(SECTION + name)) return l
+        const next = [...l.symbols]
+        next.splice(at ?? next.length, 0, SECTION + name)
+        return { ...l, symbols: next }
+      })),
       renameSection: (from, to) => set((st) => editList(st, (l) => ({ ...l, symbols: l.symbols.map((x) => (x === SECTION + from ? SECTION + to : x)) }))),
       removeEntry: (index) => set((st) => editList(st, (l) => ({ ...l, symbols: l.symbols.filter((_, i) => i !== index) }))),
       moveEntry: (from, to) => set((st) => editList(st, (l) => {
@@ -179,7 +199,7 @@ export const useApp = create<AppState>()(
         const grid = o.look?.grid ?? true
         return { ...o, look: { ...DEFAULT_LOOK, gridH: grid, gridV: grid, ...o.look }, listIdx: o.listIdx ?? 0, lists: o.lists ?? [{ name: 'Favoriler', symbols: o.favorites ?? DEFAULT_LIST.symbols }], panes: [...(o.panes ?? []), ...PANES].slice(0, PANES.length) } as AppState
       },
-      partialize: ({ prices: _p, watchSymbols: _w, snapshotAt: _s, cryptoCount: _c, editIndicator: _e, proxyDown: _d, ...rest }) => rest,
+      partialize: ({ prices: _p, watchSymbols: _w, snapshotAt: _s, cryptoCount: _c, editIndicator: _e, proxyDown: _d, txForm: _t, alertSymbol: _a, ...rest }) => rest,
     },
   ),
 )

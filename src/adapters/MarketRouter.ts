@@ -3,9 +3,12 @@ import { getSymbol } from '../data/symbols'
 import { BinanceAdapter } from './BinanceAdapter'
 import { YahooAdapter } from './YahooAdapter'
 import { SyntheticAdapter, combine } from './SyntheticAdapter'
+import { marketOpen } from '../lib/market'
 
 const ADAPTERS = { binance: BinanceAdapter, yahoo: YahooAdapter, synthetic: SyntheticAdapter }
-const POLL_MS = 30_000
+// Açık piyasada son mum sık yoklanır ki grafik sürekli aksın; kapalıyken seyrek
+const POLL_MS = 8_000
+const IDLE_EVERY = 8
 type Base = 'TRY' | 'USD'
 const FX: Record<Base, Partial<Record<Ccy, [string, 'mul' | 'div']>>> = {
   TRY: { USD: ['USDTRY=X', 'div'], EUR: ['EURTRY=X', 'div'] },
@@ -40,8 +43,9 @@ export const MarketRouter = {
 
   subscribe(symbol: string, tf: Timeframe, cb: (c: Candle) => void, ccy: Ccy = 'ORG'): () => void {
     if (getSymbol(symbol).source === 'binance' && !fxOf(symbol, ccy)) return BinanceAdapter.subscribe(symbol, tf, cb)
+    let tick = 0
     const id = setInterval(() => {
-      if (document.hidden) return
+      if (document.hidden || (!marketOpen(symbol) && ++tick % IDLE_EVERY)) return
       MarketRouter.getCandles(symbol, tf, ccy).then((l) => l.length && cb(l[l.length - 1])).catch(() => undefined)
     }, POLL_MS)
     return () => clearInterval(id)

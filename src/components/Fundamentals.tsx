@@ -4,22 +4,51 @@ import { useApp } from '../store/app'
 import { displayName, getSymbol, indicesOf, isIndex } from '../data/symbols'
 import { fmt, fmtBig } from '../lib/candles'
 import type { Fundamentals as F } from '../types'
+import Financials from './Financials'
+import KapNews from './KapNews'
+import { companyDataReady } from '../lib/company'
 
-type Kind = 'num' | 'pct' | 'big' | 'signed'
+type Kind = 'num' | 'pct' | 'big' | 'signed' | 'rating'
 const SECTIONS: [string, [string, string, Kind][]][] = [
-  ['Değerleme', [['price_earnings_ttm', 'F/K', 'num'], ['price_book_fq', 'PD/DD', 'num'], ['market_cap_basic', 'Piyasa Değeri (₺)', 'big'], ['dividends_yield_current', 'Temettü Verimi', 'pct']]],
-  ['Kârlılık', [['earnings_per_share_basic_ttm', 'Hisse Başı Kâr (₺)', 'num'], ['return_on_equity', 'Özkaynak Kârlılığı', 'pct'], ['net_income', 'Net Kâr (₺)', 'big'], ['total_revenue', 'Gelir (₺)', 'big'], ['debt_to_equity', 'Borç/Özkaynak', 'num']]],
+  ['Değerleme', [['price_earnings_ttm', 'F/K', 'num'], ['price_book_fq', 'PD/DD', 'num'], ['enterprise_value_ebitda_ttm', 'FD/FAVÖK', 'num'], ['price_sales_current', 'F/Satış', 'num'],
+    ['price_earnings_growth_ttm', 'PEG', 'num'], ['price_free_cash_flow_ttm', 'F/Serbest Nakit Akışı', 'num'], ['market_cap_basic', 'Piyasa Değeri (₺)', 'big'], ['enterprise_value_fq', 'Firma Değeri (₺)', 'big'], ['dividends_yield_current', 'Temettü Verimi', 'pct']]],
+  ['Kârlılık', [['gross_margin', 'Brüt Marj', 'pct'], ['operating_margin', 'Faaliyet Marjı', 'pct'], ['net_margin', 'Net Marj', 'pct'], ['return_on_equity', 'Özkaynak Kârlılığı', 'pct'], ['return_on_assets', 'Aktif Kârlılığı', 'pct'],
+    ['earnings_per_share_basic_ttm', 'Hisse Başı Kâr (₺)', 'num'], ['total_revenue', 'Gelir (₺)', 'big'], ['ebitda', 'FAVÖK (₺)', 'big'], ['net_income', 'Net Kâr (₺)', 'big'], ['free_cash_flow', 'Serbest Nakit Akışı (₺)', 'big']]],
+  ['Büyüme (yıllık)', [['total_revenue_yoy_growth_ttm', 'Gelir Büyümesi', 'signed'], ['earnings_per_share_diluted_yoy_growth_ttm', 'Hisse Başı Kâr Büyümesi', 'signed']]],
+  ['Bilanço Özeti', [['total_assets', 'Toplam Varlıklar (₺)', 'big'], ['total_equity_fq', 'Özkaynaklar (₺)', 'big'], ['total_debt', 'Toplam Borç (₺)', 'big'], ['debt_to_equity', 'Borç/Özkaynak', 'num'], ['current_ratio', 'Cari Oran', 'num'], ['quick_ratio', 'Likidite Oranı', 'num']]],
   ['Performans', [['change', 'Günlük', 'signed'], ['Perf.W', 'Haftalık', 'signed'], ['Perf.1M', 'Aylık', 'signed'], ['Perf.YTD', 'Yılbaşından', 'signed'], ['Perf.Y', 'Yıllık', 'signed']]],
-  ['Teknik', [['RSI', 'RSI(14)', 'num'], ['volume', 'Hacim (lot)', 'big'], ['relative_volume_10d_calc', 'Göreli Hacim (10g)', 'num']]],
+  ['Hisse ve Teknik', [['total_shares_outstanding', 'Toplam Hisse', 'big'], ['free_float', 'Halka Açıklık', 'pct'], ['beta_1_year', 'Beta (1 yıl)', 'num'], ['Volatility.M', 'Aylık Oynaklık', 'pct'], ['RSI', 'RSI(14)', 'num'],
+    ['volume', 'Hacim (lot)', 'big'], ['average_volume_30d_calc', 'Ort. Hacim (30g)', 'big'], ['relative_volume_10d_calc', 'Göreli Hacim (10g)', 'num'], ['Recommend.All', 'Teknik Görünüm', 'rating']]],
 ]
+const rating = (v: number) => (v > 0.5 ? 'Güçlü Al' : v > 0.1 ? 'Al' : v >= -0.1 ? 'Nötr' : v >= -0.5 ? 'Sat' : 'Güçlü Sat')
 
 const show = (v: number | null | undefined, k: Kind) =>
-  v == null ? '—' : k === 'big' ? fmtBig(v) : k === 'pct' ? `%${fmt(v, 2)}` : k === 'signed' ? `${v >= 0 ? '+' : ''}${fmt(v, 2)}%` : fmt(v, 2)
+  v == null ? '—' : k === 'rating' ? rating(v) : k === 'big' ? fmtBig(v) : k === 'pct' ? `%${fmt(v, 2)}` : k === 'signed' ? `${v >= 0 ? '+' : ''}${fmt(v, 2)}%` : fmt(v, 2)
 
+type Tab = 'sum' | 'fin' | 'kap'
+const TABS: [Tab, string][] = [['sum', 'Özet'], ['fin', 'Mali Tablolar'], ['kap', 'KAP Haberleri']]
+
+/** BIST hisseleri için özet oranlar, mali tablolar ve KAP bildirimleri. */
 export default function Fundamentals() {
   const symbol = useApp((s) => s.panes[s.active])
   const info = getSymbol(symbol)
   const ok = info.category === 'BIST' && !isIndex(symbol)
+  const [tab, setTab] = useState<Tab>('sum')
+  if (!ok) return <p className="p-3 text-xs text-mute">Temel analiz yalnızca BIST hisseleri için gösterilir.</p>
+  return (
+    <div>
+      <div className="flex border-b border-line">
+        {TABS.map(([k, l]) => <button key={k} className={`tab flex-1 px-1 ${tab === k ? 'tab-on' : ''}`} onClick={() => setTab(k)}>{l}</button>)}
+      </div>
+      {tab !== 'sum' && !companyDataReady() ? <p className="p-3 text-xs text-mute">Bu bölüm için veri sunucusu (Worker) gerekli.</p>
+        : tab === 'sum' ? <Summary symbol={symbol} /> : tab === 'fin' ? <Financials symbol={symbol} /> : <KapNews symbol={symbol} />}
+    </div>
+  )
+}
+
+function Summary({ symbol }: { symbol: string }) {
+  const info = getSymbol(symbol)
+  const ok = true
   const [data, setData] = useState<F | null>(null)
   const [err, setErr] = useState(false)
   useEffect(() => {
@@ -32,11 +61,12 @@ export default function Fundamentals() {
       alive = false
     }
   }, [symbol, ok])
-  if (!ok) return <p className="p-3 text-xs text-mute">Temel analiz yalnızca BIST hisseleri için gösterilir.</p>
   if (err) return <p className="p-3 text-xs text-down">Temel veriler alınamadı.</p>
   if (!data) return <p className="p-3 text-xs text-mute">Yükleniyor…</p>
   const range = data.high52 && data.low52 && data.price ? ((data.price - data.low52) / (data.high52 - data.low52)) * 100 : undefined
-  const st = data.stats ?? { price_earnings_ttm: data.pe ?? null, price_book_fq: data.pb ?? null, market_cap_basic: data.marketCap ?? null }
+  const base = data.stats ?? { price_earnings_ttm: data.pe ?? null, price_book_fq: data.pb ?? null, market_cap_basic: data.marketCap ?? null }
+  const [float, shares] = [base.float_shares_outstanding, base.total_shares_outstanding]
+  const st: Record<string, number | null | undefined> = { ...base, free_float: float && shares ? (float / shares) * 100 : null }
   const groups = indicesOf(symbol)
   return (
     <div className="p-3 text-xs space-y-3">

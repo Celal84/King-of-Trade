@@ -2,11 +2,12 @@ import { useEffect } from 'react'
 import { useApp } from '../store/app'
 import { usePaper } from '../store/paper'
 import { usePine } from '../store/pine'
+import { usePortfolio } from '../store/portfolio'
 import { CODE_RE, cloudGet, cloudPut, cloudReady, syncCode } from './cloud'
 
 // Yedeklenen veriler: uygulama deposundan seçili alanlar + ham localStorage anahtarları (çizimler, sanal portföy, Pine scriptleri).
-const APP_KEYS = ['lists', 'listIdx', 'templates', 'scans', 'notes', 'indicatorConfig'] as const
-const LS_KEYS = ['kot:paper', 'kot:pine']
+const APP_KEYS = ['lists', 'listIdx', 'templates', 'scans', 'notes', 'indicatorConfig', 'flags'] as const
+const LS_KEYS = ['kot:paper', 'kot:pine', 'kot:pf']
 const LS_PREFIX = 'kot:draw:'
 const APP_STORE = 'kot:app'
 const DEBOUNCE = 8_000
@@ -79,7 +80,7 @@ export function useCloudSync() {
     }).catch(() => {
       ready = true
     })
-    const unsub = [useApp.subscribe(schedule), usePaper.subscribe(schedule), usePine.subscribe(schedule)]
+    const unsub = [useApp.subscribe(schedule), usePaper.subscribe(schedule), usePine.subscribe(schedule), usePortfolio.subscribe(schedule)]
     window.addEventListener(DIRTY_EVENT, schedule)
     return () => {
       clearTimeout(timer)

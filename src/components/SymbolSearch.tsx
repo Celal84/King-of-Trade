@@ -7,7 +7,7 @@ import type { Category } from '../types'
 
 const LIMIT = 80
 
-export default function SymbolSearch({ onClose, compareMode, addMode }: { onClose: () => void; compareMode?: boolean; addMode?: boolean }) {
+export default function SymbolSearch({ onClose, compareMode, addMode, onPick }: { onClose: () => void; compareMode?: boolean; addMode?: boolean; onPick?: (symbol: string) => void }) {
   const [q, setQ] = useState('')
   const [cat, setCat] = useState<Category | 'ALL'>('ALL')
   const { toggleFavorite, setSymbol, compare, toggleCompare, cryptoCount, lists, listIdx } = useApp()
@@ -18,6 +18,8 @@ export default function SymbolSearch({ onClose, compareMode, addMode }: { onClos
       .sort((a, b) => +fold(b.symbol).startsWith(t) - +fold(a.symbol).startsWith(t))
   }, [q, cat, cryptoCount])
   const pick = (s: string) => {
+    // Seçim modunda pencereyi kapatmak çağıranın işidir
+    if (onPick) return onPick(s)
     if (compareMode) return toggleCompare(s)
     if (addMode) return toggleFavorite(s)
     setSymbol(s)
